@@ -83,4 +83,5 @@ jobs:
 
             - `dist/SonarrPatcher.Loader.dll` — startup-hook loader
             - `dist/SonarrPatcher.Patches.SkyHook.dll` — SkyHook redirect patch (see [SkyHook/README.md](SonarrPatcher.Patches/SkyHook/README.md))
+            - `dist/SonarrPatcher.Patches.NameTruncate.dll` — character-based `{name:N}` truncation patch (see [NameTruncate/README.md](SonarrPatcher.Patches/NameTruncate/README.md))
           files: dist/*
