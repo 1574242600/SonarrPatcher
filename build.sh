@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -e
+
+# Build script for SonarrPatcher.
+# Produces dist/SonarrPatcher.Loader.dll + dist/SonarrPatcher.Patches.SkyHook.dll (co-located for deploy).
+# Usage:
+#   build.sh
+
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+cd "$ROOT"
+
+echo "==> Building SonarrPatcher.sln (Release)"
+dotnet build SonarrPatcher.sln -c Release -m --nologo
+
+DIST="$ROOT/dist"
+mkdir -p "$DIST"
+
+cp "$ROOT/SonarrPatcher.Loader/bin/Release/net6.0/SonarrPatcher.Loader.dll" "$DIST/"
+cp "$ROOT/SonarrPatcher.Patches/SkyHook/bin/Release/net6.0/SonarrPatcher.Patches.SkyHook.dll" "$DIST/"
+
+echo "OK: $DIST"
+ls -1 "$DIST"

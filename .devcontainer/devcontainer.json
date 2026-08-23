@@ -1,0 +1,22 @@
+{
+  "name": "SonarrPatcher",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-dotnettools.csdevkit",
+        "ms-dotnettools.csharp"
+      ],
+      "settings": {
+        "dotnet.defaultSolution": "SonarrPatcher.sln"
+      }
+    }
+  },
+  "workspaceFolder": "/workspaces/SonarrPatcher",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/SonarrPatcher,type=bind"
+}
