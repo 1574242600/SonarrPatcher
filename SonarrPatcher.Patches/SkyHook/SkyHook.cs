@@ -33,6 +33,8 @@ namespace SonarrPatcher.Patches
         {
         }
 
+        public override string PatchId => "tv.sonarr.skyhookpatch";
+
         /// <summary>
         /// Standalone mode bootstraps its own dependencies (0Harmony,
         /// Sonarr.Common) from the application base directory; loader mode skips
@@ -54,7 +56,7 @@ namespace SonarrPatcher.Patches
                     SonarrDependencyLoader.EnsureLoaded("0Harmony.dll", "Sonarr.Common.dll");
                 }
 
-                new SkyHookPatch().Run(new Harmony("tv.sonarr.skyhookpatch"));
+                new SkyHookPatch().Run();
                 new Logger("SkyHookPatch").Info("Patch applied. host=" + _host + " lang=" + _lang + (standalone ? "" : " (loader)"));
             }
             catch (Exception ex)

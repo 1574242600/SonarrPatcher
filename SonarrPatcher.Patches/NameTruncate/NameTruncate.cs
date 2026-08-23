@@ -18,12 +18,12 @@ namespace SonarrPatcher.Patches
     /// </summary>
     internal sealed class NameTruncate : Patch
     {
-        private const string PatchId = "tv.sonarr.nametruncatepatch";
-
         public NameTruncate()
             : base("NameTruncatePatch")
         {
         }
+
+        public override string PatchId => "tv.sonarr.nametruncatepatch";
 
         public static void Initialize()
         {
@@ -50,7 +50,7 @@ namespace SonarrPatcher.Patches
                     SonarrDependencyLoader.EnsureLoaded("0Harmony.dll", "Sonarr.Common.dll");
                 }
 
-                new NameTruncate().Run(new Harmony(PatchId));
+                new NameTruncate().Run();
             }
             catch (Exception ex)
             {
