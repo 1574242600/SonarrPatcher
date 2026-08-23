@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <AssemblyName>SonarrPatcher.Patches.NameTruncate</AssemblyName>
+    <RootNamespace>SonarrPatcher.Patches</RootNamespace>
+    <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\Patch.cs" Link="Patches/Patch.cs" />
+    <Compile Include="..\..\SonarrPatcher.Common\**\*.cs" LinkBase="Common" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Lib.Harmony" Version="2.3.3" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="SonarrPatcher.Tests" />
+  </ItemGroup>
+</Project>

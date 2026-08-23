@@ -22,11 +22,13 @@
   <ItemGroup>
     <ProjectReference Include="..\SonarrPatcher.Loader\SonarrPatcher.Loader.csproj" />
     <ProjectReference Include="..\SonarrPatcher.Patches\SkyHook\SonarrPatcher.Patches.SkyHook.csproj" />
+    <ProjectReference Include="..\SonarrPatcher.Patches\NameTruncate\SonarrPatcher.Patches.NameTruncate.csproj" />
     <ProjectReference Include="..\SonarrPatcher.TestTarget\SonarrPatcher.TestTarget.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" />
   </ItemGroup>
   <ItemGroup Condition="Exists('$(SonarrDir)\Sonarr.Common.dll') and Exists('$(SonarrDir)\0Harmony.dll')">
     <None Include="$(SonarrDir)\Sonarr.Common.dll" Link="Sonarr.Common.dll" CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(SonarrDir)\0Harmony.dll" Link="0Harmony.dll" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(SonarrDir)\Sonarr.Core.dll" Link="Sonarr.Core.dll" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <Target Name="CopyTestTargetDll" AfterTargets="Build">
     <Copy SourceFiles="$(MSBuildProjectDirectory)\..\SonarrPatcher.TestTarget\bin\$(Configuration)\net6.0\SonarrPatcher.TestTarget.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />

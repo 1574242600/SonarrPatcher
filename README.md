@@ -16,6 +16,7 @@ A patch can also run standalone: point `DOTNET_STARTUP_HOOKS` directly at the pa
 | Name | Description | README |
 | --- | --- | --- |
 | SkyHookPatch | Redirects Sonarr's `SkyHookTvdb` metadata requests to a custom host and language | [SkyHook/README.md](SonarrPatcher.Patches/SkyHook/README.md) |
+| NameTruncatePatch | Makes `{name:N}` truncate by characters (grapheme clusters) instead of bytes, fixing non-English (CJK/emoji/combining) names | [NameTruncate/README.md](SonarrPatcher.Patches/NameTruncate/README.md) |
 
 ## Deploy
 
@@ -41,7 +42,7 @@ services:
 ### Build & Test
 
 ```sh
-./build.sh                            # dist/SonarrPatcher.Loader.dll + dist/SonarrPatcher.Patches.SkyHook.dll (Release, net6.0)
+./build.sh                            # dist/SonarrPatcher.Loader.dll + dist/SonarrPatcher.Patches.*.dll (Release, net6.0)
 ./test.sh                             # restore/build/run the xunit suite
 ./test.sh -s /path/to/sonarr-publish  # run against a different Sonarr publish dir
 ```
