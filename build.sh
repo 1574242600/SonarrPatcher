@@ -24,6 +24,7 @@ mkdir -p "$DIST"
 cp "$ROOT/SonarrPatcher.Loader/bin/Release/net6.0/SonarrPatcher.Loader.dll" "$DIST/"
 cp "$ROOT/SonarrPatcher.Patches/SkyHook/bin/Release/net6.0/SonarrPatcher.Patches.SkyHook.dll" "$DIST/"
 cp "$ROOT/SonarrPatcher.Patches/NameTruncate/bin/Release/net6.0/SonarrPatcher.Patches.NameTruncate.dll" "$DIST/"
+cp "$ROOT/SonarrPatcher.Patches/XemAliases/bin/Release/net6.0/SonarrPatcher.Patches.XemAliases.dll" "$DIST/"
 
 echo "OK: $DIST"
 ls -1 "$DIST"

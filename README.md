@@ -17,6 +17,7 @@ A patch can also run standalone: point `DOTNET_STARTUP_HOOKS` directly at the pa
 | --- | --- | --- |
 | SkyHookPatch | Redirects Sonarr's `SkyHookTvdb` metadata requests to a custom host and language | [SkyHook/README.md](SonarrPatcher.Patches/SkyHook/README.md) |
 | NameTruncatePatch | Makes `{name:N}` truncate by characters (grapheme clusters) instead of bytes, fixing non-English (CJK/emoji/combining) names | [NameTruncate/README.md](SonarrPatcher.Patches/NameTruncate/README.md) |
+| XemAliasesPatch | Redirects the XEM `allNames` scene-mapping request to a custom URL and relaxes the alias English-only filter (allows CJK, keeps a 255-char ceiling) | [XemAliases/README.md](SonarrPatcher.Patches/XemAliases/README.md) |
 
 ## Deploy
 

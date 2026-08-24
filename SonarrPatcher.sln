@@ -10,6 +10,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SonarrPatcher.Patches.SkyHo
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SonarrPatcher.Patches.NameTruncate", "SonarrPatcher.Patches\NameTruncate\SonarrPatcher.Patches.NameTruncate.csproj", "{143F59D8-3E08-41DA-81EC-A3F30D8E6DDE}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SonarrPatcher.Patches.XemAliases", "SonarrPatcher.Patches\XemAliases\SonarrPatcher.Patches.XemAliases.csproj", "{DFC72825-A606-4CEE-91AB-14520F4D0E1D}"
+EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SonarrPatcher.TestTarget", "SonarrPatcher.TestTarget\SonarrPatcher.TestTarget.csproj", "{72B5B77B-8075-47A2-AAB3-0452F15E8FF6}"
 EndProject
 Global
@@ -34,6 +36,10 @@ Global
 		{143F59D8-3E08-41DA-81EC-A3F30D8E6DDE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{143F59D8-3E08-41DA-81EC-A3F30D8E6DDE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{143F59D8-3E08-41DA-81EC-A3F30D8E6DDE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DFC72825-A606-4CEE-91AB-14520F4D0E1D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DFC72825-A606-4CEE-91AB-14520F4D0E1D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DFC72825-A606-4CEE-91AB-14520F4D0E1D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DFC72825-A606-4CEE-91AB-14520F4D0E1D}.Release|Any CPU.Build.0 = Release|Any CPU
 		{72B5B77B-8075-47A2-AAB3-0452F15E8FF6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{72B5B77B-8075-47A2-AAB3-0452F15E8FF6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{72B5B77B-8075-47A2-AAB3-0452F15E8FF6}.Release|Any CPU.ActiveCfg = Release|Any CPU
