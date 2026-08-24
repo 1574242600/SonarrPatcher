@@ -178,7 +178,8 @@ namespace SonarrPatcher.Tests
             LogSink.Reset();
 
             var loaderAssembly = AppDomain.CurrentDomain.GetAssemblies()
-                .First(a => a.GetName().Name == "SonarrPatcher.Loader");
+                .FirstOrDefault(a => a.GetName().Name == "SonarrPatcher.Loader")
+                ?? Assembly.Load("SonarrPatcher.Loader");
             var loaderSinkType = loaderAssembly.GetType("SonarrPatcher.Common.LogSink");
             Assert.NotNull(loaderSinkType);
 
