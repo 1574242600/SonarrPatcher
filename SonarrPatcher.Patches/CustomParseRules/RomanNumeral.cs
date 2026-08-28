@@ -1,6 +1,6 @@
 using System;
 
-namespace SonarrPatcher.Patches
+namespace SonarrPatcher.Patches.CustomParseRules
 {
     /// <summary>
     /// Strict Roman numeral (I, IV, V, IX, X, XL, L, XC) to integer conversion, capped

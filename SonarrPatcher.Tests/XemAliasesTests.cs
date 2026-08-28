@@ -5,7 +5,7 @@ using System.Reflection;
 using System.Runtime.Loader;
 using System.Runtime.Serialization;
 using HarmonyLib;
-using SonarrPatcher.Patches;
+using SonarrPatcher.Patches.XemAliases;
 using Xunit;
 
 namespace SonarrPatcher.Tests
@@ -23,19 +23,19 @@ namespace SonarrPatcher.Tests
         [InlineData("境界線上のホライゾン II")]
         public void NonAscii_WithinLimit_Allowed(string title)
         {
-            Assert.True(XemAliasesPatch.IsEnglishReplacement(title));
+            Assert.True(XemAliases.IsEnglishReplacement(title));
         }
 
         [Fact]
         public void Exactly255_Allowed()
         {
-            Assert.True(XemAliasesPatch.IsEnglishReplacement(new string('a', 255)));
+            Assert.True(XemAliases.IsEnglishReplacement(new string('a', 255)));
         }
 
         [Fact]
         public void Over255_Rejected()
         {
-            Assert.False(XemAliasesPatch.IsEnglishReplacement(new string('a', 256)));
+            Assert.False(XemAliases.IsEnglishReplacement(new string('a', 256)));
         }
 
         // ---- Integration tests against the real Sonarr assemblies ----
@@ -54,7 +54,7 @@ namespace SonarrPatcher.Tests
             Assert.True(InvokeIsEnglish(type, method, new string('a', 256)));
 
             // Apply the patch and verify CJK is allowed while the 255 length cap remains.
-            XemAliases.Initialize();
+            new XemAliases().Run();
             Assert.True(InvokeIsEnglish(type, method, "無職転生"));
             Assert.True(InvokeIsEnglish(type, method, "境界線上のホライゾン II"));
             Assert.False(InvokeIsEnglish(type, method, new string('a', 256)));
@@ -65,7 +65,7 @@ namespace SonarrPatcher.Tests
         {
             EnsureCommonLoaded();
 
-            var url = XemAliasesPatch.BuildAllNamesRequestUrl("http://xem.example.org/map/allNames");
+            var url = XemAliases.BuildAllNamesRequestUrl("http://xem.example.org/map/allNames");
 
             Assert.StartsWith("http://xem.example.org/map/allNames", url);
             Assert.Contains("origin=tvdb", url);
@@ -77,7 +77,7 @@ namespace SonarrPatcher.Tests
         {
             EnsureCommonLoaded();
 
-            var url = XemAliasesPatch.BuildAllNamesRequestUrl("https://mirror.example.net/map/allNames");
+            var url = XemAliases.BuildAllNamesRequestUrl("https://mirror.example.net/map/allNames");
 
             Assert.StartsWith("https://mirror.example.net/map/allNames", url);
             Assert.Contains("origin=tvdb", url);
@@ -95,14 +95,14 @@ namespace SonarrPatcher.Tests
 
             try
             {
-                XemAliases.Initialize();
+                new XemAliases().Run();
 
                 var type = AccessTools.TypeByName("NzbDrone.Core.DataAugmentation.Xem.XemProxy");
                 var method = AccessTools.DeclaredMethod(type, "GetSceneTvdbNames");
                 var info = Harmony.GetPatchInfo(method);
 
                 Assert.NotNull(info);
-                Assert.Contains(info.Prefixes, p => p.PatchMethod.DeclaringType == typeof(XemAliasesPatch));
+                Assert.Contains(info.Prefixes, p => p.PatchMethod.DeclaringType == typeof(XemAliases));
             }
             finally
             {
@@ -122,7 +122,7 @@ namespace SonarrPatcher.Tests
 
             try
             {
-                XemAliases.Initialize();
+                new XemAliases().Run();
 
                 var type = AccessTools.TypeByName("NzbDrone.Core.DataAugmentation.Xem.XemProxy");
                 var method = AccessTools.DeclaredMethod(type, "GetSceneTvdbNames");

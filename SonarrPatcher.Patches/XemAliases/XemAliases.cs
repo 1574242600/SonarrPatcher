@@ -6,60 +6,28 @@ using System.Reflection;
 using HarmonyLib;
 using Newtonsoft.Json.Linq;
 using SonarrPatcher.Common;
+using SonarrPatcher.Patches;
 
-namespace SonarrPatcher.Patches
+namespace SonarrPatcher.Patches.XemAliases
 {
     /// <summary>
-    /// Public entry point used by the StartupHook and tests. The actual patch is
-    /// the internal <see cref="XemAliasesPatch"/> deriving from the shared Patch base.
+    /// Patches Xem alias handling: optionally redirects the allNames request to a
+    /// custom URL (via the <c>XEM_ALLNAMES_URL</c> environment variable) and relaxes
+    /// the <c>IsEnglish</c> alias filter from ASCII-only to a 255-character ceiling.
     /// </summary>
-    public static class XemAliases
-    {
-        public static void Initialize()
-        {
-            XemAliasesPatch.Initialize(standalone: true);
-        }
-
-        public static void InitializeForLoader()
-        {
-            XemAliasesPatch.Initialize(standalone: false);
-        }
-    }
-
-    internal class XemAliasesPatch : Patch
+    public sealed class XemAliases : Patch
     {
         private static string _allNamesUrl;
 
-        public XemAliasesPatch()
-            : base("XemAliasesPatch")
+        static XemAliases()
         {
+            Name = "XemAliasesPatch";
+            Log = new Logger(Name);
         }
 
-        public override string PatchId => "tv.sonarr.xemaliasespatch";
-
-        /// <summary>
-        /// Standalone mode bootstraps its own dependencies (0Harmony,
-        /// Sonarr.Common) from the application base directory; loader mode skips
-        /// that because the Loader has already ensured they are loaded.
-        /// </summary>
-        public static void Initialize(bool standalone)
+        public XemAliases()
         {
             ConfigureFromEnv();
-
-            try
-            {
-                if (standalone)
-                {
-                    SonarrDependencyLoader.EnsureLoaded("0Harmony.dll", "Sonarr.Common.dll");
-                }
-
-                new XemAliasesPatch().Run();
-                new Logger("XemAliasesPatch").Info("Patch applied. allNamesUrl=" + (_allNamesUrl ?? "(unset)"));
-            }
-            catch (Exception ex)
-            {
-                new Logger("XemAliasesPatch").Error("Failed to apply patch: " + ex);
-            }
         }
 
         private static void ConfigureFromEnv()
@@ -90,7 +58,7 @@ namespace SonarrPatcher.Patches
                     throw new InvalidOperationException("XemProxy.GetSceneTvdbNames not found");
                 }
 
-                var prefix = typeof(XemAliasesPatch).GetMethod(nameof(GetSceneTvdbNamesPrefix), BindingFlags.NonPublic | BindingFlags.Static);
+                var prefix = typeof(XemAliases).GetMethod(nameof(GetSceneTvdbNamesPrefix), BindingFlags.NonPublic | BindingFlags.Static);
                 harmony.Patch(getSceneTvdbNames, prefix: new HarmonyMethod(prefix));
                 Log.Info("Patched XemProxy.GetSceneTvdbNames to redirect allNames to " + _allNamesUrl);
             }
@@ -109,10 +77,12 @@ namespace SonarrPatcher.Patches
                     throw new InvalidOperationException("SceneMappingService.IsEnglish not found");
                 }
 
-                var prefix = typeof(XemAliasesPatch).GetMethod(nameof(IsEnglishPrefix), BindingFlags.NonPublic | BindingFlags.Static);
+                var prefix = typeof(XemAliases).GetMethod(nameof(IsEnglishPrefix), BindingFlags.NonPublic | BindingFlags.Static);
                 harmony.Patch(isEnglish, prefix: new HarmonyMethod(prefix));
                 Log.Info("Patched SceneMappingService.IsEnglish: alias filter is now character count (<=255) instead of ASCII-only");
             }
+
+            Log.Info("Patch applied. allNamesUrl=" + (_allNamesUrl ?? "(unset)"));
         }
 
         /// <summary>
@@ -151,7 +121,7 @@ namespace SonarrPatcher.Patches
             }
             catch (Exception ex)
             {
-                new Logger("XemAliasesPatch").Error("allNames redirect failed, falling back to original: " + ex);
+                Log.Error("allNames redirect failed, falling back to original: " + ex);
                 return true;
             }
         }

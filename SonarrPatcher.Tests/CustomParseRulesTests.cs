@@ -1,6 +1,6 @@
 using System;
 using System.IO;
-using SonarrPatcher.Patches;
+using SonarrPatcher.Patches.CustomParseRules;
 using Xunit;
 
 namespace SonarrPatcher.Tests

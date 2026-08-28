@@ -1,30 +1,16 @@
-using System;
 using SonarrPatcher.Common;
-using SonarrPatcher.Patches;
+using SonarrPatcher.Patches.SkyHook;
 
 internal class StartupHook
 {
     public static void Initialize()
     {
-        try
-        {
-            SkyHook.Initialize();
-        }
-        catch (Exception ex)
-        {
-            new Logger("SkyHookPatch").Error("StartupHook failed: " + ex);
-        }
+        SonarrDependencyLoader.EnsureLoaded("0Harmony.dll", "Sonarr.Common.dll");
+        new SkyHook().Run();
     }
 
     public static void InitializeForLoader()
     {
-        try
-        {
-            SkyHook.InitializeForLoader();
-        }
-        catch (Exception ex)
-        {
-            new Logger("SkyHookPatch").Error("StartupHook failed (loader): " + ex);
-        }
+        new SkyHook().Run();
     }
 }

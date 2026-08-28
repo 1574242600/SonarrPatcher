@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using SonarrPatcher.Common;
 
-namespace SonarrPatcher.Patches
+namespace SonarrPatcher.Patches.CustomParseRules
 {
     /// <summary>
     /// A parsed rule plus its compiled regex. <see cref="Rule"/> carries the user

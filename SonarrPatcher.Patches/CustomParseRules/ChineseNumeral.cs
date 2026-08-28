@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace SonarrPatcher.Patches
+namespace SonarrPatcher.Patches.CustomParseRules
 {
     /// <summary>
     /// Converts Chinese numerals up to the tens place (1-99): single characters

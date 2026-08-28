@@ -6,7 +6,7 @@ using System.Runtime.Loader;
 using System.Runtime.Serialization;
 using System.Text;
 using HarmonyLib;
-using SonarrPatcher.Patches;
+using SonarrPatcher.Patches.NameTruncate;
 using Xunit;
 
 namespace SonarrPatcher.Tests
@@ -98,7 +98,7 @@ namespace SonarrPatcher.Tests
             Assert.Equal(new string('东', 9) + "{ellipsis}", InvokeTruncate(type, method, new string('东', 40), "30"));
 
             // Apply the patch and verify character-based truncation (27 + ellipsis).
-            NameTruncate.Initialize();
+            new NameTruncate().Run();
             Assert.Equal(new string('东', 27) + "{ellipsis}", InvokeTruncate(type, method, new string('东', 40), "30"));
         }
 
@@ -110,7 +110,7 @@ namespace SonarrPatcher.Tests
             Unpatch();
             var before = InvokeTruncate(type, method, new string('a', 40), "30");
 
-            NameTruncate.Initialize();
+            new NameTruncate().Run();
             var after = InvokeTruncate(type, method, new string('a', 40), "30");
 
             Assert.Equal(before, after);
@@ -122,7 +122,7 @@ namespace SonarrPatcher.Tests
         {
             var (type, method) = EnsureTruncateAvailable();
 
-            NameTruncate.Initialize();
+            new NameTruncate().Run();
 
             var family = "👨\u200d👩\u200d👧\u200d👦";
             var result = InvokeTruncate(type, method, Repeat(family, 12), "10");
@@ -135,7 +135,7 @@ namespace SonarrPatcher.Tests
         {
             var (type, method) = EnsureTruncateAvailable();
 
-            NameTruncate.Initialize();
+            new NameTruncate().Run();
 
             var name = new string('东', 25);
             Assert.Equal(name, InvokeTruncate(type, method, name, "30"));

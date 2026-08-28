@@ -1,31 +1,38 @@
+using System;
 using HarmonyLib;
 using SonarrPatcher.Common;
 
 namespace SonarrPatcher.Patches
 {
     /// <summary>
-    /// Base class for all SonarrPatcher patches. Provides the patch name (also
-    /// used as the logger prefix), the Harmony patch id (<see cref="PatchId"/>),
-    /// a per-patch logger and the standard ShouldPatch/Apply lifecycle mirroring
-    /// Sonarr's own RuntimePatchBase. <see cref="Run"/> owns the Harmony instance
-    /// so derived patches never construct one themselves.
+    /// Base class for all SonarrPatcher patches. Exposes the static patch
+    /// <see cref="Name"/> (also used as the logger prefix), the Harmony patch id
+    /// (<see cref="PatchId"/>, derived from <see cref="Name"/>), a per-patch static
+    /// logger (<see cref="Log"/>) and the standard ShouldPatch/Apply lifecycle
+    /// mirroring Sonarr's own RuntimePatchBase. Derived patches set <see cref="Name"/>
+    /// and <see cref="Log"/> in their static constructors; <see cref="Run"/> owns the
+    /// Harmony instance so derived patches never construct one themselves, and logs
+    /// (instead of rethrowing) any failure so Sonarr can still boot if a patch fails.
     /// </summary>
-    internal abstract class Patch
+    public abstract class Patch
     {
-        protected Patch(string name)
-        {
-            Name = name;
-            Log = new Logger(name);
-        }
-
-        public string Name { get; }
+        /// <summary>
+        /// Patch name, also used as the logger prefix. Set by each derived patch in
+        /// its static constructor.
+        /// </summary>
+        public static string Name { get; protected set; }
 
         /// <summary>
-        /// Harmony id used to build the <see cref="Harmony"/> instance for this patch.
+        /// Harmony id used to build the <see cref="Harmony"/> instance for this patch,
+        /// generated from <see cref="Name"/>.
         /// </summary>
-        public abstract string PatchId { get; }
+        public static string PatchId => "tv.sonarr." + Name.ToLowerInvariant();
 
-        protected ILogger Log { get; }
+        /// <summary>
+        /// Per-patch logger prefixed with <see cref="Name"/>. Set by each derived
+        /// patch in its static constructor.
+        /// </summary>
+        internal static ILogger Log;
 
         public virtual bool ShouldPatch() => true;
 
@@ -33,9 +40,16 @@ namespace SonarrPatcher.Patches
 
         public void Run()
         {
-            if (ShouldPatch())
+            try
             {
-                Apply(new Harmony(PatchId));
+                if (ShouldPatch())
+                {
+                    Apply(new Harmony(PatchId));
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Failed to apply patch: " + ex);
             }
         }
     }

@@ -5,8 +5,9 @@ using System.Reflection;
 using System.Text;
 using HarmonyLib;
 using SonarrPatcher.Common;
+using SonarrPatcher.Patches;
 
-namespace SonarrPatcher.Patches
+namespace SonarrPatcher.Patches.NameTruncate
 {
     /// <summary>
     /// Replaces <c>NzbDrone.Core.Organizer.FileNameBuilder.Truncate(string, string)</c> so that
@@ -16,46 +17,12 @@ namespace SonarrPatcher.Patches
     /// combining characters) which was either silently left untruncated or cut to ~1/3 of the
     /// requested length.
     /// </summary>
-    internal sealed class NameTruncate : Patch
+    public sealed class NameTruncate : Patch
     {
-        public NameTruncate()
-            : base("NameTruncatePatch")
+        static NameTruncate()
         {
-        }
-
-        public override string PatchId => "tv.sonarr.nametruncatepatch";
-
-        public static void Initialize()
-        {
-            Initialize(standalone: true);
-        }
-
-        public static void InitializeForLoader()
-        {
-            Initialize(standalone: false);
-        }
-
-        /// <summary>
-        /// Standalone mode bootstraps its own dependencies (0Harmony, Sonarr.Common,
-        /// Sonarr.Core) from the application base directory; loader mode skips that
-        /// because the Loader has already ensured the first two are loaded (Sonarr.Core
-        /// is still ensured here because the Loader does not load it).
-        /// </summary>
-        public static void Initialize(bool standalone)
-        {
-            try
-            {
-                if (standalone)
-                {
-                    SonarrDependencyLoader.EnsureLoaded("0Harmony.dll", "Sonarr.Common.dll");
-                }
-
-                new NameTruncate().Run();
-            }
-            catch (Exception ex)
-            {
-                new Logger("NameTruncatePatch").Error("Failed to apply patch: " + ex);
-            }
+            Name = "NameTruncatePatch";
+            Log = new Logger(Name);
         }
 
         public override bool ShouldPatch()

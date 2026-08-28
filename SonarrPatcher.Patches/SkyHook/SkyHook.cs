@@ -3,66 +3,29 @@ using System.Linq;
 using System.Reflection;
 using HarmonyLib;
 using SonarrPatcher.Common;
+using SonarrPatcher.Patches;
 
-namespace SonarrPatcher.Patches
+namespace SonarrPatcher.Patches.SkyHook
 {
     /// <summary>
-    /// Public entry point used by the StartupHook and tests. The actual patch is
-    /// the internal <see cref="SkyHookPatch"/> deriving from the shared Patch base.
+    /// Redirects Sonarr's SkyHook (tvdb data provider) requests to a custom
+    /// host/language via the <c>SKYHOOK_HOST</c> / <c>SKYHOOK_LANG</c> environment
+    /// variables.
     /// </summary>
-    public static class SkyHook
-    {
-        public static void Initialize()
-        {
-            SkyHookPatch.Initialize(standalone: true);
-        }
-
-        public static void InitializeForLoader()
-        {
-            SkyHookPatch.Initialize(standalone: false);
-        }
-    }
-
-    internal class SkyHookPatch : Patch
+    public sealed class SkyHook : Patch
     {
         private static string _host;
         private static string _lang;
 
-        public SkyHookPatch()
-            : base("SkyHookPatch")
+        static SkyHook()
         {
+            Name = "SkyHookPatch";
+            Log = new Logger(Name);
         }
 
-        public override string PatchId => "tv.sonarr.skyhookpatch";
-
-        /// <summary>
-        /// Standalone mode bootstraps its own dependencies (0Harmony,
-        /// Sonarr.Common) from the application base directory; loader mode skips
-        /// that because the Loader has already ensured they are loaded.
-        /// </summary>
-        public static void Initialize(bool standalone)
+        public SkyHook()
         {
             ConfigureFromEnv();
-
-            if (string.IsNullOrEmpty(_host))
-            {
-                return;
-            }
-
-            try
-            {
-                if (standalone)
-                {
-                    SonarrDependencyLoader.EnsureLoaded("0Harmony.dll", "Sonarr.Common.dll");
-                }
-
-                new SkyHookPatch().Run();
-                new Logger("SkyHookPatch").Info("Patch applied. host=" + _host + " lang=" + _lang + (standalone ? "" : " (loader)"));
-            }
-            catch (Exception ex)
-            {
-                new Logger("SkyHookPatch").Error("Failed to apply patch: " + ex);
-            }
         }
 
         private static void ConfigureFromEnv()
@@ -95,8 +58,10 @@ namespace SonarrPatcher.Patches
                 throw new InvalidOperationException("SonarrCloudRequestBuilder constructor not found");
             }
 
-            var postfixMethod = typeof(SkyHookPatch).GetMethod(nameof(Postfix), BindingFlags.NonPublic | BindingFlags.Static);
+            var postfixMethod = typeof(SkyHook).GetMethod(nameof(Postfix), BindingFlags.NonPublic | BindingFlags.Static);
             harmony.Patch(constructor, postfix: new HarmonyMethod(postfixMethod));
+
+            Log.Info("Patch applied. host=" + _host + " lang=" + _lang);
         }
 
         private static void Postfix(object __instance)
@@ -114,7 +79,7 @@ namespace SonarrPatcher.Patches
 
                 if (builderHelperType == null || factoryInterfaceType == null)
                 {
-                    new Logger("SkyHookPatch").Warn("HttpRequestBuilder types not found, skipping");
+                    Log.Warn("HttpRequestBuilder types not found, skipping");
                     return;
                 }
 
@@ -141,7 +106,7 @@ namespace SonarrPatcher.Patches
 
                 if (field == null)
                 {
-                    new Logger("SkyHookPatch").Warn("SkyHookTvdb field not found, skipping");
+                    Log.Warn("SkyHookTvdb field not found, skipping");
                     return;
                 }
 
@@ -149,7 +114,7 @@ namespace SonarrPatcher.Patches
             }
             catch (Exception ex)
             {
-                new Logger("SkyHookPatch").Error("Postfix error: " + ex);
+                Log.Error("Postfix error: " + ex);
             }
         }
     }

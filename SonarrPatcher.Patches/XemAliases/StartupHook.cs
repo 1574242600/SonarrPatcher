@@ -1,30 +1,16 @@
-using System;
 using SonarrPatcher.Common;
-using SonarrPatcher.Patches;
+using SonarrPatcher.Patches.XemAliases;
 
 internal class StartupHook
 {
     public static void Initialize()
     {
-        try
-        {
-            XemAliases.Initialize();
-        }
-        catch (Exception ex)
-        {
-            new Logger("XemAliasesPatch").Error("StartupHook failed: " + ex);
-        }
+        SonarrDependencyLoader.EnsureLoaded("0Harmony.dll", "Sonarr.Common.dll");
+        new XemAliases().Run();
     }
 
     public static void InitializeForLoader()
     {
-        try
-        {
-            XemAliases.InitializeForLoader();
-        }
-        catch (Exception ex)
-        {
-            new Logger("XemAliasesPatch").Error("StartupHook failed (loader): " + ex);
-        }
+        new XemAliases().Run();
     }
 }

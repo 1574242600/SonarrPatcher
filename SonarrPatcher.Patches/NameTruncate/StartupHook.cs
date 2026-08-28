@@ -1,30 +1,16 @@
-using System;
 using SonarrPatcher.Common;
-using SonarrPatcher.Patches;
+using SonarrPatcher.Patches.NameTruncate;
 
 internal class StartupHook
 {
     public static void Initialize()
     {
-        try
-        {
-            NameTruncate.Initialize();
-        }
-        catch (Exception ex)
-        {
-            new Logger("NameTruncatePatch").Error("StartupHook failed: " + ex);
-        }
+        SonarrDependencyLoader.EnsureLoaded("0Harmony.dll", "Sonarr.Common.dll");
+        new NameTruncate().Run();
     }
 
     public static void InitializeForLoader()
     {
-        try
-        {
-            NameTruncate.InitializeForLoader();
-        }
-        catch (Exception ex)
-        {
-            new Logger("NameTruncatePatch").Error("StartupHook failed (loader): " + ex);
-        }
+        new NameTruncate().Run();
     }
 }

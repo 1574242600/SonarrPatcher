@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace SonarrPatcher.Patches
+namespace SonarrPatcher.Patches.CustomParseRules
 {
     /// <summary>
     /// Optional forced quality for a rule. <see cref="Source"/> maps to

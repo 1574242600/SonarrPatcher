@@ -2,75 +2,47 @@ using System;
 using System.Reflection;
 using HarmonyLib;
 using SonarrPatcher.Common;
+using SonarrPatcher.Patches;
 
-namespace SonarrPatcher.Patches
+namespace SonarrPatcher.Patches.CustomParseRules
 {
     /// <summary>
-    /// Public entry point used by the StartupHook and tests. The actual patch is the
-    /// internal <see cref="CustomParseRulesPatch"/> deriving from the shared Patch base.
+    /// Rewrites release titles that match user-defined rules (from the
+    /// <c>CUSTOM_PARSE_RULES_FILE</c> environment variable or a default config path)
+    /// before Sonarr's built-in parser sees them.
     /// </summary>
-    public static class CustomParseRules
-    {
-        public static void Initialize()
-        {
-            CustomParseRulesPatch.Initialize(standalone: true);
-        }
-
-        public static void InitializeForLoader()
-        {
-            CustomParseRulesPatch.Initialize(standalone: false);
-        }
-    }
-
-    internal class CustomParseRulesPatch : Patch
+    public sealed class CustomParseRules : Patch
     {
         internal static ParseRuleEngine Engine;
 
-        public CustomParseRulesPatch()
-            : base("CustomParseRules")
+        static CustomParseRules()
         {
+            Name = "CustomParseRules";
+            Log = new Logger(Name);
         }
 
-        public override string PatchId => "tv.sonarr.customparserulespatch";
-
-        /// <summary>
-        /// Standalone mode bootstraps its own dependencies (0Harmony, Sonarr.Common)
-        /// from the application base directory; loader mode skips that because the
-        /// Loader has already ensured they are loaded.
-        /// </summary>
-        public static void Initialize(bool standalone)
+        public CustomParseRules()
         {
             var configPath = ParseRuleEngine.ResolveConfigPath(Environment.GetEnvironmentVariable("CUSTOM_PARSE_RULES_FILE"));
 
             if (!System.IO.File.Exists(configPath))
             {
-                new Logger("CustomParseRules").Info("No rules file at " + configPath + ", patch not applied");
+                Log.Info("No rules file at " + configPath + ", patch not applied");
                 return;
             }
 
-            try
+            Engine = new ParseRuleEngine(configPath);
+            Log.Info("Loaded " + Engine.RuleCount + " rule(s) from " + configPath);
+
+            if (!Engine.HasRules)
             {
-                if (standalone)
-                {
-                    SonarrDependencyLoader.EnsureLoaded("0Harmony.dll", "Sonarr.Common.dll");
-                }
-
-                Engine = new ParseRuleEngine(configPath);
-                new Logger("CustomParseRules").Info("Loaded " + Engine.RuleCount + " rule(s) from " + configPath);
-
-                if (!Engine.HasRules)
-                {
-                    new Logger("CustomParseRules").Warn("No enabled rules, patch not applied");
-                    return;
-                }
-
-                new CustomParseRulesPatch().Run();
-                new Logger("CustomParseRules").Info("Patch applied. rules=" + Engine.RuleCount);
+                Log.Warn("No enabled rules, patch not applied");
             }
-            catch (Exception ex)
-            {
-                new Logger("CustomParseRules").Error("Failed to apply patch: " + ex);
-            }
+        }
+
+        public override bool ShouldPatch()
+        {
+            return Engine != null && Engine.HasRules;
         }
 
         protected override void Apply(Harmony harmony)
@@ -89,8 +61,10 @@ namespace SonarrPatcher.Patches
                 throw new InvalidOperationException("Parser.ParseTitle not found");
             }
 
-            var prefix = typeof(CustomParseRulesPatch).GetMethod(nameof(ParseTitlePrefix), BindingFlags.NonPublic | BindingFlags.Static);
+            var prefix = typeof(CustomParseRules).GetMethod(nameof(ParseTitlePrefix), BindingFlags.NonPublic | BindingFlags.Static);
             harmony.Patch(parseTitle, prefix: new HarmonyMethod(prefix));
+
+            Log.Info("Patch applied. rules=" + Engine.RuleCount);
         }
 
         /// <summary>

@@ -1,30 +1,16 @@
-using System;
 using SonarrPatcher.Common;
-using SonarrPatcher.Patches;
+using SonarrPatcher.Patches.CustomParseRules;
 
 internal class StartupHook
 {
     public static void Initialize()
     {
-        try
-        {
-            CustomParseRules.Initialize();
-        }
-        catch (Exception ex)
-        {
-            new Logger("CustomParseRules").Error("StartupHook failed: " + ex);
-        }
+        SonarrDependencyLoader.EnsureLoaded("0Harmony.dll", "Sonarr.Common.dll");
+        new CustomParseRules().Run();
     }
 
     public static void InitializeForLoader()
     {
-        try
-        {
-            CustomParseRules.InitializeForLoader();
-        }
-        catch (Exception ex)
-        {
-            new Logger("CustomParseRules").Error("StartupHook failed (loader): " + ex);
-        }
+        new CustomParseRules().Run();
     }
 }

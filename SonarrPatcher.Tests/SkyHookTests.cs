@@ -5,7 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.Loader;
 using HarmonyLib;
-using SonarrPatcher.Patches;
+using SonarrPatcher.Patches.SkyHook;
 using Xunit;
 
 namespace SonarrPatcher.Tests
@@ -19,7 +19,7 @@ namespace SonarrPatcher.Tests
             Environment.SetEnvironmentVariable("SKYHOOK_HOST", null);
             Environment.SetEnvironmentVariable("SKYHOOK_LANG", null);
 
-            SkyHook.Initialize();
+            new SkyHook().Run();
 
             var url = GetBaseUrl();
             Assert.StartsWith("https://skyhook.sonarr.tv/", url);
@@ -32,7 +32,7 @@ namespace SonarrPatcher.Tests
             Environment.SetEnvironmentVariable("SKYHOOK_HOST", "mysky.example.org");
             Environment.SetEnvironmentVariable("SKYHOOK_LANG", "zh-cn");
 
-            SkyHook.Initialize();
+            new SkyHook().Run();
 
             var (baseUrl, lang) = GetBaseUrlAndLang();
             Assert.Equal("http://mysky.example.org/v1/tvdb/{route}/{language}/", baseUrl);
@@ -46,7 +46,7 @@ namespace SonarrPatcher.Tests
             Environment.SetEnvironmentVariable("SKYHOOK_HOST", "http://mysky.example.org");
             Environment.SetEnvironmentVariable("SKYHOOK_LANG", null);
 
-            SkyHook.Initialize();
+            new SkyHook().Run();
 
             var baseUrl = GetBaseUrl();
             Assert.StartsWith("http://mysky.example.org/", baseUrl);
@@ -59,7 +59,7 @@ namespace SonarrPatcher.Tests
             Environment.SetEnvironmentVariable("SKYHOOK_HOST", "mysky.example.org");
             Environment.SetEnvironmentVariable("SKYHOOK_LANG", "zh-cn");
 
-            SkyHook.Initialize();
+            new SkyHook().Run();
 
             var t = AccessTools.TypeByName("NzbDrone.Common.Cloud.SonarrCloudRequestBuilder");
             var inst = Activator.CreateInstance(t);

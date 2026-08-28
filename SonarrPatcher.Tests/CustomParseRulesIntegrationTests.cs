@@ -6,7 +6,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.Loader;
 using HarmonyLib;
-using SonarrPatcher.Patches;
+using SonarrPatcher.Patches.CustomParseRules;
 using Xunit;
 
 namespace SonarrPatcher.Tests
@@ -173,13 +173,13 @@ namespace SonarrPatcher.Tests
         {
             Unpatch();
             Environment.SetEnvironmentVariable("CUSTOM_PARSE_RULES_FILE", configPath);
-            CustomParseRules.Initialize();
+            new CustomParseRules().Run();
         }
 
         private static void Cleanup(string configPath)
         {
             Environment.SetEnvironmentVariable("CUSTOM_PARSE_RULES_FILE", null);
-            CustomParseRulesPatch.Engine = null;
+            CustomParseRules.Engine = null;
             Unpatch();
 
             try
