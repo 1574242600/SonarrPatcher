@@ -24,6 +24,7 @@
     <ProjectReference Include="..\SonarrPatcher.Patches\SkyHook\SonarrPatcher.Patches.SkyHook.csproj" />
     <ProjectReference Include="..\SonarrPatcher.Patches\NameTruncate\SonarrPatcher.Patches.NameTruncate.csproj" />
     <ProjectReference Include="..\SonarrPatcher.Patches\XemAliases\SonarrPatcher.Patches.XemAliases.csproj" />
+    <ProjectReference Include="..\SonarrPatcher.Patches\CustomParseRules\SonarrPatcher.Patches.CustomParseRules.csproj" />
     <ProjectReference Include="..\SonarrPatcher.TestTarget\SonarrPatcher.TestTarget.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" />
   </ItemGroup>
   <ItemGroup Condition="Exists('$(SonarrDir)\Sonarr.Common.dll') and Exists('$(SonarrDir)\0Harmony.dll')">
@@ -31,6 +32,10 @@
     <None Include="$(SonarrDir)\0Harmony.dll" Link="0Harmony.dll" CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(SonarrDir)\Sonarr.Core.dll" Link="Sonarr.Core.dll" CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(SonarrDir)\NLog.dll" Link="NLog.dll" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(SonarrDir)\NLog.Layouts.ClefJsonLayout.dll" Link="NLog.Layouts.ClefJsonLayout.dll" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="custom-parse-rules.example.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <Target Name="CopyTestTargetDll" AfterTargets="Build">
     <Copy SourceFiles="$(MSBuildProjectDirectory)\..\SonarrPatcher.TestTarget\bin\$(Configuration)\net6.0\SonarrPatcher.TestTarget.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />

@@ -1,0 +1,16 @@
+[
+  {
+    "id": "rules.example.fansub",
+    "pattern": "^\\[(?<subgroup>示例字幕组)\\](?<title>.*?)[ ._-]S(?<season>\\d{1,2})E(?<episode>\\d{1,3})(?<tokens>.*)$",
+    "language": ["简繁", "eng"],
+    "quality": { "resolution": 1080, "source": "WEB-DL" }
+  },
+  {
+    "id": "rules.example.roman-season",
+    "pattern": "^\\[(?<subgroup>罗马组)\\](?<title>.*?)[ ._-]Season(?<season>[IVXLCDM]{1,7})(?<tokens>.*)$"
+  },
+  {
+    "id": "rules.example.chinese-season",
+    "pattern": "^\\[(?<subgroup>中文组)\\](?<title>.*?)[ ._-]第(?<season>[一二三四五六七八九壹贰叁肆伍陆柒捌玖十拾]+)季(?<tokens>.*)$"
+  }
+]
