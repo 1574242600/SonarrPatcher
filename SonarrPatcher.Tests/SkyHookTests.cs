@@ -16,8 +16,7 @@ namespace SonarrPatcher.Tests
         public void NoEnv_KeepsOriginalSkyHookUrl()
         {
             EnsureSonarrLoaded();
-            Environment.SetEnvironmentVariable("SKYHOOK_HOST", null);
-            Environment.SetEnvironmentVariable("SKYHOOK_LANG", null);
+            SetConfig(null, "eng");
 
             new SkyHook().Run();
 
@@ -29,8 +28,7 @@ namespace SonarrPatcher.Tests
         public void HostAndLang_PatchesBaseUrlAndLanguage()
         {
             EnsureSonarrLoaded();
-            Environment.SetEnvironmentVariable("SKYHOOK_HOST", "mysky.example.org");
-            Environment.SetEnvironmentVariable("SKYHOOK_LANG", "zh-cn");
+            SetConfig("mysky.example.org", "zh-cn");
 
             new SkyHook().Run();
 
@@ -43,8 +41,7 @@ namespace SonarrPatcher.Tests
         public void HostWithProtocol_KeepsExplicitProtocol()
         {
             EnsureSonarrLoaded();
-            Environment.SetEnvironmentVariable("SKYHOOK_HOST", "http://mysky.example.org");
-            Environment.SetEnvironmentVariable("SKYHOOK_LANG", null);
+            SetConfig("http://mysky.example.org", "eng");
 
             new SkyHook().Run();
 
@@ -56,8 +53,7 @@ namespace SonarrPatcher.Tests
         public void FullRequestBuild_UsesPatchedHostAndLang()
         {
             EnsureSonarrLoaded();
-            Environment.SetEnvironmentVariable("SKYHOOK_HOST", "mysky.example.org");
-            Environment.SetEnvironmentVariable("SKYHOOK_LANG", "zh-cn");
+            SetConfig("mysky.example.org", "zh-cn");
 
             new SkyHook().Run();
 
@@ -81,6 +77,17 @@ namespace SonarrPatcher.Tests
             var fullUrl = request.GetType().GetProperty("Url").GetValue(request).ToString();
             Assert.StartsWith("http://mysky.example.org/", fullUrl);
             Assert.Contains("/zh-cn/", fullUrl);
+        }
+
+        private static void SetConfig(string host, string lang)
+        {
+            if (string.IsNullOrEmpty(lang))
+            {
+                lang = "eng";
+            }
+
+            typeof(SkyHook).GetField("_host", BindingFlags.NonPublic | BindingFlags.Static).SetValue(null, host);
+            typeof(SkyHook).GetField("_lang", BindingFlags.NonPublic | BindingFlags.Static).SetValue(null, lang);
         }
 
         private static void EnsureSonarrLoaded()

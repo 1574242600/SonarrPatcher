@@ -19,15 +19,18 @@ namespace SonarrPatcher.Patches.NameTruncate
     /// </summary>
     public sealed class NameTruncate : Patch
     {
+        private static bool _disabled;
+
         static NameTruncate()
         {
             Name = "NameTruncatePatch";
             Log = new Logger(Name);
+            _disabled = Environment.GetEnvironmentVariable("DISABLE_NAMETRUNCATE_PATCH") == "1";
         }
 
         public override bool ShouldPatch()
         {
-            return Environment.GetEnvironmentVariable("DISABLE_NAMETRUNCATE_PATCH") != "1";
+            return !_disabled;
         }
 
         protected override void Apply(Harmony harmony)

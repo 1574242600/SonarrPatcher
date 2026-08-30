@@ -23,15 +23,6 @@ namespace SonarrPatcher.Patches.XemAliases
         {
             Name = "XemAliasesPatch";
             Log = new Logger(Name);
-        }
-
-        public XemAliases()
-        {
-            ConfigureFromEnv();
-        }
-
-        private static void ConfigureFromEnv()
-        {
             _allNamesUrl = Environment.GetEnvironmentVariable("XEM_ALLNAMES_URL");
         }
 

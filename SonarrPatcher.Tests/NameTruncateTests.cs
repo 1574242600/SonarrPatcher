@@ -85,6 +85,25 @@ namespace SonarrPatcher.Tests
             Assert.Equal("{ellipsis}", NameTruncate.TruncateReplacement("abcd", "2"));
         }
 
+        [Fact]
+        public void Disabled_SkipsPatch()
+        {
+            SetDisabled(true);
+            try
+            {
+                Assert.False(new NameTruncate().ShouldPatch());
+            }
+            finally
+            {
+                SetDisabled(false);
+            }
+        }
+
+        private static void SetDisabled(bool disabled)
+        {
+            typeof(NameTruncate).GetField("_disabled", BindingFlags.NonPublic | BindingFlags.Static).SetValue(null, disabled);
+        }
+
         // ---- Integration tests against the real Sonarr.Core assembly ----
 
         [SkippableFact]

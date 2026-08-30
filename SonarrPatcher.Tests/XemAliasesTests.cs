@@ -46,7 +46,7 @@ namespace SonarrPatcher.Tests
             var (type, method) = EnsureIsEnglishAvailable();
 
             Unpatch();
-            Environment.SetEnvironmentVariable("XEM_ALLNAMES_URL", null);
+            SetAllNamesUrl(null);
             Environment.SetEnvironmentVariable("DISABLE_NONENGLISH_ALIASES_PATCH", null);
 
             // Before the patch: ASCII-only (CJK rejected, long ASCII accepted).
@@ -90,7 +90,7 @@ namespace SonarrPatcher.Tests
             EnsureCoreLoaded();
 
             Unpatch();
-            Environment.SetEnvironmentVariable("XEM_ALLNAMES_URL", "http://xem.example.org/map/allNames");
+            SetAllNamesUrl("http://xem.example.org/map/allNames");
             Environment.SetEnvironmentVariable("DISABLE_NONENGLISH_ALIASES_PATCH", null);
 
             try
@@ -106,7 +106,7 @@ namespace SonarrPatcher.Tests
             }
             finally
             {
-                Environment.SetEnvironmentVariable("XEM_ALLNAMES_URL", null);
+                SetAllNamesUrl(null);
                 Unpatch();
             }
         }
@@ -117,7 +117,7 @@ namespace SonarrPatcher.Tests
             EnsureCoreLoaded();
 
             Unpatch();
-            Environment.SetEnvironmentVariable("XEM_ALLNAMES_URL", null);
+            SetAllNamesUrl(null);
             Environment.SetEnvironmentVariable("DISABLE_NONENGLISH_ALIASES_PATCH", "1");
 
             try
@@ -193,6 +193,11 @@ namespace SonarrPatcher.Tests
             {
                 AssemblyLoadContext.Default.LoadFromAssemblyPath(path);
             }
+        }
+
+        private static void SetAllNamesUrl(string url)
+        {
+            typeof(XemAliases).GetField("_allNamesUrl", BindingFlags.NonPublic | BindingFlags.Static).SetValue(null, url);
         }
 
         private static void Unpatch()

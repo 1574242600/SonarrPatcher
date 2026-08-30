@@ -21,15 +21,6 @@ namespace SonarrPatcher.Patches.SkyHook
         {
             Name = "SkyHookPatch";
             Log = new Logger(Name);
-        }
-
-        public SkyHook()
-        {
-            ConfigureFromEnv();
-        }
-
-        private static void ConfigureFromEnv()
-        {
             _host = Environment.GetEnvironmentVariable("SKYHOOK_HOST");
             _lang = Environment.GetEnvironmentVariable("SKYHOOK_LANG");
 
