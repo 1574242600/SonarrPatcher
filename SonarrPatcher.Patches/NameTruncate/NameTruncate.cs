@@ -35,10 +35,6 @@ namespace SonarrPatcher.Patches.NameTruncate
 
         protected override void Apply(Harmony harmony)
         {
-            // The StartupHook runs before Sonarr's main entry point, so Sonarr.Core
-            // may not be loaded yet; load it explicitly so the type can be resolved.
-            SonarrDependencyLoader.EnsureLoaded("Sonarr.Core.dll");
-
             var builderType = AccessTools.TypeByName("NzbDrone.Core.Organizer.FileNameBuilder");
             if (builderType == null)
             {
