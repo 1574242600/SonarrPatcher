@@ -8,9 +8,4 @@ internal class StartupHook
         SonarrDependencyLoader.EnsureLoaded("0Harmony.dll", "Sonarr.Common.dll");
         new NameTruncate().Run();
     }
-
-    public static void InitializeForLoader()
-    {
-        new NameTruncate().Run();
-    }
 }

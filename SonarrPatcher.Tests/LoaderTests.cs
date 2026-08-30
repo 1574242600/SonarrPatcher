@@ -40,9 +40,7 @@ namespace SonarrPatcher.Tests
             var target = assemblies.FirstOrDefault(a => a.GetName().Name == "SonarrPatcher.TestTarget");
             Assert.NotNull(target);
             var invoked = (bool)target.GetType("StartupHook").GetField("Invoked").GetValue(null);
-            var invokedForLoader = (bool)target.GetType("StartupHook").GetField("InvokedForLoader").GetValue(null);
-            Assert.True(invokedForLoader);
-            Assert.False(invoked);
+            Assert.True(invoked);
             Assert.DoesNotContain(assemblies, a => a.GetName().Name == "SonarrPatcher.Loader");
         }
 

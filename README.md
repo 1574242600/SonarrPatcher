@@ -7,7 +7,7 @@ Sonarr (v4 main branch) already ships `0Harmony.dll` as part of its runtime patc
 ## How it works
 
 1. `DOTNET_STARTUP_HOOKS` points at `SonarrPatcher.Loader.dll`; the runtime calls its `StartupHook.Initialize()` before Sonarr's `Main`.
-2. `Loader.LoadAll()` scans its own directory for every other `SonarrPatcher*.dll`, loads it into the default `AssemblyLoadContext`, and invokes its `StartupHook.InitializeForLoader()`. It pre-loads `0Harmony.dll` from the application base directory first so patches don't have to bootstrap dependencies themselves.
+2. `Loader.LoadAll()` scans its own directory for every other `SonarrPatcher*.dll`, loads it into the default `AssemblyLoadContext`, and invokes its `StartupHook.Initialize()` — the same entry point used when a patch runs standalone. `EnsureLoaded` is idempotent, so the Loader pre-loading `0Harmony.dll` from the application base directory first is just an optimization, not a requirement.
 
 A patch can also run standalone: point `DOTNET_STARTUP_HOOKS` directly at the patch DLL — its `StartupHook.Initialize()` self-bootstraps dependencies and applies the patch.
 

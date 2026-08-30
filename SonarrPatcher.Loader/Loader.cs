@@ -50,14 +50,14 @@ namespace SonarrPatcher
                     loaded.Add(assembly);
 
                     var hookType = assembly.GetType("StartupHook");
-                    var initializeForLoader = hookType?.GetMethod("InitializeForLoader", BindingFlags.Public | BindingFlags.Static);
-                    if (initializeForLoader == null)
+                    var initialize = hookType?.GetMethod("Initialize", BindingFlags.Public | BindingFlags.Static);
+                    if (initialize == null)
                     {
-                        Log.Warn(fileName + " has no StartupHook.InitializeForLoader, skipped");
+                        Log.Warn(fileName + " has no StartupHook.Initialize, skipped");
                         continue;
                     }
 
-                    initializeForLoader.Invoke(null, null);
+                    initialize.Invoke(null, null);
                     Log.Info("Loaded " + fileName);
                 }
                 catch (Exception ex)
