@@ -3,12 +3,18 @@
 # (the same source CI builds) and publish it with AssemblyVersion=0.0.0.0.
 #
 # Idempotent: when the checkout is already at the latest release and the
-# publish output exists, it just prints the version. Otherwise it checks out
-# the latest tag, builds, and prints the version.
+# publish output exists, it just prints the version. Otherwise it clones the
+# source if missing, checks out the latest tag, builds, and prints the version.
 #
 # Usage: sonarr-sync.sh            (uses defaults below)
 #        SONARR_SRC=/path sonarr-sync.sh
 set -euo pipefail
+
+# GitHub sometimes breaks under HTTP/2 from containers/proxies
+# ("error: RPC failed; curl 16 Error in the HTTP2 framing layer").
+export GIT_CONFIG_COUNT=1
+export GIT_CONFIG_KEY_0=http.version
+export GIT_CONFIG_VALUE_0=HTTP/1.1
 
 SONARR_SRC="${SONARR_SRC:-/workspaces/Sonarr}"
 PUBLISH_DIR="${PUBLISH_DIR:-$SONARR_SRC/_output/net6.0/linux-x64/publish}"
@@ -36,6 +42,16 @@ fi
 echo "    latest release: $LATEST_TAG"
 
 echo "==> Syncing $SONARR_SRC"
+if [[ ! -d "$SONARR_SRC/.git" ]]; then
+    if [[ -e "$SONARR_SRC" && ! -d "$SONARR_SRC" ]]; then
+        echo "error: $SONARR_SRC exists and is not a directory" >&2
+        exit 1
+    fi
+    echo "    source missing, cloning"
+    mkdir -p "$(dirname "$SONARR_SRC")"
+    git clone --depth=1 https://github.com/Sonarr/Sonarr.git "$SONARR_SRC"
+fi
+
 git -C "$SONARR_SRC" fetch --tags --quiet --force
 
 CURRENT_HEAD=$(git -C "$SONARR_SRC" rev-parse HEAD)
