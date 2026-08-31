@@ -1,24 +1,40 @@
 name: Build Sonarr backend
 description: |
-  Clone Sonarr and publish only the Console entry project for linux-x64.
+  Clone Sonarr at its latest GitHub release (unless ref is overridden) and
+  publish only the Console entry project for linux-x64.
   This builds the minimal dependency graph needed by SonarrPatcher
   (Sonarr.Common.dll / Sonarr.Core.dll / 0Harmony.dll / NLog.dll / DryIoc.dll / ...),
   instead of the full `PublishAllRids` build (all RIDs + all test projects).
-  The publish output is cached keyed by the upstream commit SHA, so when
-  Sonarr main is unchanged the compile is skipped and the cached output
-  is restored into /tmp/Sonarr/_output/net6.0/linux-x64/publish, the path
-  expected by build.sh / test.sh -s.
+  The publish output is cached keyed by the upstream commit SHA, so when the
+  same Sonarr release is unchanged the compile is skipped and the cached
+  output is restored into /tmp/Sonarr/_output/net6.0/linux-x64/publish, the
+  path expected by build.sh / test.sh -s.
+  Building the release (not main) keeps the patch references and the deployed
+  Sonarr on the same source, so embedded AssemblyVersions and APIs match.
 inputs:
   ref:
-    description: Sonarr git ref to build (branch or tag)
+    description: >-
+      Sonarr git ref to build (branch or tag). Defaults to the latest GitHub
+      release (matching the latest official container images).
     required: false
-    default: main
+    default: ''
 runs:
   using: composite
   steps:
+    - name: Resolve Sonarr ref (latest release unless overridden)
+      id: ref
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.ref }}" ]; then
+          echo "ref=${{ inputs.ref }}" >> "$GITHUB_OUTPUT"
+        else
+          tag=$(curl -sS https://api.github.com/repos/Sonarr/Sonarr/releases/latest | jq -r .tag_name)
+          echo "ref=$tag" >> "$GITHUB_OUTPUT"
+        fi
+
     - name: Checkout Sonarr
       shell: bash
-      run: git clone --depth=1 --branch=${{ inputs.ref }} https://github.com/Sonarr/Sonarr.git /tmp/Sonarr
+      run: git clone --depth=1 --branch=${{ steps.ref.outputs.ref }} https://github.com/Sonarr/Sonarr.git /tmp/Sonarr
 
     - name: Resolve Sonarr commit SHA
       id: sha
@@ -30,7 +46,7 @@ runs:
       uses: actions/cache@v4
       with:
         path: /tmp/Sonarr/_output
-        key: sonarr-${{ inputs.ref }}-${{ steps.sha.outputs.sha }}
+        key: sonarr-${{ steps.ref.outputs.ref }}-${{ steps.sha.outputs.sha }}
 
     - name: Publish Sonarr.Console (linux-x64 only)
       if: steps.sonarr-cache.outputs.cache-hit != 'true'
@@ -44,4 +60,5 @@ runs:
           --self-contained false \
           -p:EnableAnalyzers=false \
           -o /tmp/Sonarr/_output/net6.0/linux-x64/publish
+
 
