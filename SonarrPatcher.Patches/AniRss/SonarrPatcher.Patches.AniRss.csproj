@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <AssemblyName>SonarrPatcher.Patches.AniRss</AssemblyName>
+    <RootNamespace>SonarrPatcher.Patches</RootNamespace>
+    <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
+    <SonarrDir Condition="'$(SonarrDir)' == ''">/workspaces/Sonarr/_output/net6.0/linux-x64/publish</SonarrDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\Patch.cs" Link="Patches/Patch.cs" />
+    <Compile Include="..\..\SonarrPatcher.Common\**\*.cs" LinkBase="Common" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Lib.Harmony" Version="2.3.3" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="Sonarr.Common">
+      <HintPath>$(SonarrDir)\Sonarr.Common.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Sonarr.Core">
+      <HintPath>$(SonarrDir)\Sonarr.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="NLog">
+      <HintPath>$(SonarrDir)\NLog.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="DryIoc">
+      <HintPath>$(SonarrDir)\DryIoc.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="SonarrPatcher.Tests" />
+  </ItemGroup>
+</Project>
