@@ -41,6 +41,7 @@ jobs:
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_ENV"
 
       - name: Build Sonarr backend (Console project only, linux-x64)
+        id: build-sonarr
         uses: ./.github/actions/build-sonarr
 
       - name: Build patches against Sonarr
@@ -72,6 +73,7 @@ jobs:
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_ENV"
 
       - name: Build Sonarr backend (Console project only, linux-x64)
+        id: build-sonarr
         uses: ./.github/actions/build-sonarr
 
       - name: Full test suite (including SkyHook integration tests)
@@ -90,6 +92,8 @@ jobs:
           name: ${{ github.ref_name }}
           body: |
             SonarrPatcher ${{ github.ref_name }}
+
+            Built against Sonarr **${{ steps.build-sonarr.outputs.sonarr-ref }}** (latest release at build time).
 
             - `dist/SonarrPatcher.Loader.dll` — startup-hook loader
             - `dist/SonarrPatcher.Patches.SkyHook.dll` — SkyHook redirect patch (see [SkyHook/README.md](SonarrPatcher.Patches/SkyHook/README.md))

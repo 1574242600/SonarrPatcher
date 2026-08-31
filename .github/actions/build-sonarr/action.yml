@@ -11,6 +11,9 @@ description: |
   path expected by build.sh / test.sh -s.
   Building the release (not main) keeps the patch references and the deployed
   Sonarr on the same source, so embedded AssemblyVersions and APIs match.
+  The publish pins AssemblyVersion to 0.0.0.0: patch references then always
+  request 0.0.0.0, which the default binder can roll forward from to any
+  deployed Sonarr version (10.0.0.*), so no version-specific binding is needed.
 inputs:
   ref:
     description: >-
@@ -18,6 +21,10 @@ inputs:
       release (matching the latest official container images).
     required: false
     default: ''
+outputs:
+  sonarr-ref:
+    description: Sonarr git ref (tag or branch) this build used
+    value: ${{ steps.ref.outputs.ref }}
 runs:
   using: composite
   steps:
@@ -59,6 +66,7 @@ runs:
           -r linux-x64 \
           --self-contained false \
           -p:EnableAnalyzers=false \
+          -p:AssemblyVersion=0.0.0.0 \
           -o /tmp/Sonarr/_output/net6.0/linux-x64/publish
 
 
