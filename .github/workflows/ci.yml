@@ -4,7 +4,19 @@ on:
   push:
     branches: [main]
     tags: ['v*']
+    paths:
+      - '**'
+      - '!**/*.md'
+      - '!**/.*'
+      - '!**/.*/**'
+      - '.github/**'
   pull_request:
+    paths:
+      - '**'
+      - '!**/*.md'
+      - '!**/.*'
+      - '!**/.*/**'
+      - '.github/**'
 
 permissions:
   contents: write
