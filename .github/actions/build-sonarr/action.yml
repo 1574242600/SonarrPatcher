@@ -1,0 +1,45 @@
+name: Build Sonarr backend
+description: |
+  Clone Sonarr and publish only the Console entry project for linux-x64.
+  This builds the minimal dependency graph needed by SonarrPatcher
+  (Sonarr.Common.dll / Sonarr.Core.dll / 0Harmony.dll / NLog.dll / DryIoc.dll / ...),
+  instead of the full `PublishAllRids` build (all RIDs + all test projects).
+  The publish output is cached keyed by the upstream commit SHA, so when
+  Sonarr main is unchanged the compile is skipped and the cached output
+  is restored into /tmp/Sonarr/_output/net6.0/linux-x64/publish, the path
+  expected by build.sh / test.sh -s.
+inputs:
+  ref:
+    description: Sonarr git ref to build (branch or tag)
+    required: false
+    default: main
+runs:
+  using: composite
+  steps:
+    - name: Checkout Sonarr
+      shell: bash
+      run: git clone --depth=1 --branch=${{ inputs.ref }} https://github.com/Sonarr/Sonarr.git /tmp/Sonarr
+
+    - name: Resolve Sonarr commit SHA
+      id: sha
+      shell: bash
+      run: echo "sha=$(git -C /tmp/Sonarr rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+    - name: Cache Sonarr publish output
+      id: sonarr-cache
+      uses: actions/cache@v4
+      with:
+        path: /tmp/Sonarr/_output
+        key: sonarr-${{ inputs.ref }}-${{ steps.sha.outputs.sha }}
+
+    - name: Publish Sonarr.Console (linux-x64 only)
+      if: steps.sonarr-cache.outputs.cache-hit != 'true'
+      shell: bash
+      working-directory: /tmp/Sonarr
+      run: |
+        dotnet publish src/NzbDrone.Console/Sonarr.Console.csproj \
+          -c Release \
+          -r linux-x64 \
+          --self-contained false \
+          -o /tmp/Sonarr/_output/net6.0/linux-x64/publish
+

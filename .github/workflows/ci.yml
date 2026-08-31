@@ -9,9 +9,13 @@ on:
 permissions:
   contents: write
 
+env:
+  # Path to the Sonarr publish output consumed by build.sh / test.sh -s
+  SONARR_PUBLISH_DIR: /tmp/Sonarr/_output/net6.0/linux-x64/publish
+
 jobs:
   build:
-    name: Build & unit tests
+    name: Build & full tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,11 +28,14 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_ENV"
 
-      - name: Build
-        run: ./build.sh
+      - name: Build Sonarr backend (Console project only, linux-x64)
+        uses: ./.github/actions/build-sonarr
 
-      - name: Unit tests (integration tests skip without a Sonarr build)
-        run: dotnet test SonarrPatcher.sln -c Release --no-build --nologo
+      - name: Build patches against Sonarr
+        run: ./build.sh -s "$SONARR_PUBLISH_DIR"
+
+      - name: Full test suite (integration tests included)
+        run: dotnet test SonarrPatcher.sln -c Release --no-build --nologo -p:SonarrDir="$SONARR_PUBLISH_DIR"
 
       - name: Upload dist artifacts
         uses: actions/upload-artifact@v4
@@ -52,20 +59,11 @@ jobs:
       - name: Set version from tag
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_ENV"
 
-      - name: Build Sonarr backend
-        run: |
-          git clone --depth=1 --branch=main https://github.com/Sonarr/Sonarr.git /tmp/Sonarr
-          cd /tmp/Sonarr
-          dotnet msbuild -restore src/Sonarr.sln \
-            -p:Configuration=Release \
-            -p:Platform=Posix \
-            -p:RuntimeIdentifiers=linux-x64 \
-            -p:SelfContained=true \
-            -p:EnableWindowsTargeting=true \
-            -t:PublishAllRids
+      - name: Build Sonarr backend (Console project only, linux-x64)
+        uses: ./.github/actions/build-sonarr
 
       - name: Full test suite (including SkyHook integration tests)
-        run: ./test.sh -s /tmp/Sonarr/_output/net6.0/linux-x64/publish
+        run: ./test.sh -s "$SONARR_PUBLISH_DIR"
 
       - name: Download dist artifacts
         uses: actions/download-artifact@v4

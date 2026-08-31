@@ -45,6 +45,9 @@ services:
 
 ```sh
 ./build.sh                            # dist/SonarrPatcher.Loader.dll + dist/SonarrPatcher.Patches.*.dll (Release, net6.0)
+./build.sh -s <dir>                   # build against a different Sonarr publish dir
 ./test.sh                             # restore/build/run the xunit suite
 ./test.sh -s /path/to/sonarr-publish  # run against a different Sonarr publish dir
 ```
+
+CI always builds a minimal Sonarr backend (only the `NzbDrone.Console` entry project, `linux-x64`, framework-dependent) so the integration tests never skip — on every push, PR and tag. The publish output is cached by upstream commit SHA, so Sonarr is only recompiled when `main` actually changes. See `.github/actions/build-sonarr/action.yml`.
