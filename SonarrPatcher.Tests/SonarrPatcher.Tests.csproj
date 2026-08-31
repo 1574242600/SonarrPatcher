@@ -18,6 +18,9 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Lib.Harmony" Version="2.3.3" />
+    <!-- Same pin as the AniRss patch project: overrides the net6.0 framework ref of
+         System.Formats.Asn1 (6.0) with Sonarr's version (8.0), killing the MSB3277 warning. -->
+    <PackageReference Include="System.Formats.Asn1" Version="8.0.1" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\SonarrPatcher.Loader\SonarrPatcher.Loader.csproj" />

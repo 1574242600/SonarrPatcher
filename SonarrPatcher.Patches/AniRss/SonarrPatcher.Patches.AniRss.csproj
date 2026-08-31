@@ -12,6 +12,10 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Lib.Harmony" Version="2.3.3" />
+    <!-- Sonarr.Core depends on System.Formats.Asn1 8.0.x (MailKit -> Pkcs chain); pin the same
+         version via NuGet so it overrides the net6.0 framework ref (6.0) and the MSB3277
+         version-conflict warning disappears. -->
+    <PackageReference Include="System.Formats.Asn1" Version="8.0.1" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Sonarr.Common">
