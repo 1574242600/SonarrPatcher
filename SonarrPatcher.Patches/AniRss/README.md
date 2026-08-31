@@ -1,18 +1,21 @@
 # AniRss Patch
 
-An ani-rss style subscription downloader for Sonarr: instead of relying on Sonarr's own
-search/indexer integration (which needs releases whose names parse), it watches your own
-list of RSS feeds with a configurable per-feed episode-number regex, pushes matching
-releases straight to a download client, and then **forces the import to use the episode it
-grabbed** — no matter how unparseable the downloaded file names are.
+Implements the core functionality of [ani-rss](https://github.com/wushuo894/ani-rss) via a
+**new scheduled task on Sonarr's own task manager**: instead of relying on Sonarr's
+search/indexer integration, it watches your own RSS feeds with a configurable per-feed
+episode-number regex, pushes matching releases to a download client, and **forces the
+import to use the episode it grabbed** — no matter how unparseable the downloaded file
+names are.
 
-Two Harmony patches do the wiring (task registration + service capture), and the import
-step uses Sonarr's own `ManualImportCommand` — nothing internal is re-implemented.
+Two Harmony patches do the wiring (registering the `AniRssCommand` task into Sonarr's
+scheduled-task repository/cache + service capture), and the import step uses Sonarr's own
+`ManualImportCommand` — nothing internal is re-implemented.
 
 ## What it does
 
-1. **Scheduled task** — registers `AniRssCommand` on Sonarr's task manager, so the
-   subscription pass runs every `ANIRSS_INTERVAL_MINUTES`.
+1. **Scheduled task** — registers a new `AniRssCommand` task into Sonarr's own
+   scheduled-task repository/cache, so the subscription pass runs every
+   `ANIRSS_INTERVAL_MINUTES`.
 2. **Subscription pass** (`AniRssCommandExecutor`) — for each subscribed series:
    - loads the subscribe config (file or command payload),
    - resolves the download client (optionally by name),
