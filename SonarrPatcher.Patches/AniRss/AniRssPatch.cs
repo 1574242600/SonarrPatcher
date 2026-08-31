@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Reflection;
 using HarmonyLib;
 using NzbDrone.Common.Cache;
@@ -25,7 +24,8 @@ namespace SonarrPatcher.Patches.AniRss
 
         /// <summary>
         /// Subscribe config file path. Taken from <c>ANIRSS_SUBSCRIBE_FILE</c>; when unset it
-        /// defaults to <c>config/anirss.subscribe.json</c> next to the patch assembly.
+        /// defaults to <c>config/anirss.subscribe.json</c> next to the patch assembly
+        /// (see <see cref="Paths"/>).
         /// </summary>
         public static string SubscribeFile { get; private set; }
 
@@ -42,12 +42,8 @@ namespace SonarrPatcher.Patches.AniRss
             if (string.IsNullOrWhiteSpace(SubscribeFile))
             {
                 // Default: config/anirss.subscribe.json next to the patch DLL (the loader
-                // resolves this assembly from disk, so Location is the deployed path).
-                var patchDirectory = Path.GetDirectoryName(typeof(AniRssPatch).Assembly.Location);
-                SubscribeFile = Path.Combine(
-                    string.IsNullOrWhiteSpace(patchDirectory) ? AppContext.BaseDirectory : patchDirectory,
-                    "config",
-                    "anirss.subscribe.json");
+                // resolves this assembly from disk, so the patch directory is the deployed path).
+                SubscribeFile = Paths.Resolve("config", "anirss.subscribe.json");
             }
         }
 
