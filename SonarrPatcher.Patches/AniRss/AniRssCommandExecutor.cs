@@ -102,7 +102,7 @@ namespace SonarrPatcher.Patches.AniRss
             var configPath = AniRssPatch.SubscribeFile;
             if (configPath.IsNullOrWhiteSpace())
             {
-                _logger.Warn("ANIRSS_SUBSCRIBE_FILE is not set, skipping execution.");
+                _logger.Warn("subscribe file path is empty, skipping execution.");
                 return null;
             }
 
@@ -346,7 +346,7 @@ namespace SonarrPatcher.Patches.AniRss
         {
             if (configPath.IsNullOrWhiteSpace())
             {
-                _logger.Warn("ANIRSS_SUBSCRIBE_FILE is not set, cannot persist subscribe config.");
+                _logger.Warn("subscribe file path is empty, cannot persist subscribe config.");
                 return;
             }
 

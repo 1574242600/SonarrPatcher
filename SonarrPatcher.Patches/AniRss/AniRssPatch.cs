@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
 using HarmonyLib;
 using NzbDrone.Common.Cache;
@@ -22,7 +23,10 @@ namespace SonarrPatcher.Patches.AniRss
     {
         private static int _intervalMinutes;
 
-        /// <summary>Subscribe config file path (<c>ANIRSS_SUBSCRIBE_FILE</c>).</summary>
+        /// <summary>
+        /// Subscribe config file path. Taken from <c>ANIRSS_SUBSCRIBE_FILE</c>; when unset it
+        /// defaults to <c>config/anirss.subscribe.json</c> next to the patch assembly.
+        /// </summary>
         public static string SubscribeFile { get; private set; }
 
         /// <summary>Download client name (<c>ANIRSS_DOWNLOAD_CLIENT_NAME</c>); empty means first configured client.</summary>
@@ -32,15 +36,26 @@ namespace SonarrPatcher.Patches.AniRss
         {
             Name = "AniRssPatch";
             _intervalMinutes = int.TryParse(Environment.GetEnvironmentVariable("ANIRSS_INTERVAL_MINUTES"), out var interval) ? interval : 60;
-            SubscribeFile = Environment.GetEnvironmentVariable("ANIRSS_SUBSCRIBE_FILE");
             DownloadClientName = Environment.GetEnvironmentVariable("ANIRSS_DOWNLOAD_CLIENT_NAME");
+
+            SubscribeFile = Environment.GetEnvironmentVariable("ANIRSS_SUBSCRIBE_FILE");
+            if (string.IsNullOrWhiteSpace(SubscribeFile))
+            {
+                // Default: config/anirss.subscribe.json next to the patch DLL (the loader
+                // resolves this assembly from disk, so Location is the deployed path).
+                var patchDirectory = Path.GetDirectoryName(typeof(AniRssPatch).Assembly.Location);
+                SubscribeFile = Path.Combine(
+                    string.IsNullOrWhiteSpace(patchDirectory) ? AppContext.BaseDirectory : patchDirectory,
+                    "config",
+                    "anirss.subscribe.json");
+            }
         }
 
         public override bool ShouldPatch()
         {
-            if (_intervalMinutes == 0 || string.IsNullOrWhiteSpace(SubscribeFile))
+            if (_intervalMinutes == 0)
             {
-                Log.Info("disabled (ANIRSS_INTERVAL_MINUTES=0 or ANIRSS_SUBSCRIBE_FILE empty)");
+                Log.Info("disabled (ANIRSS_INTERVAL_MINUTES=0)");
                 return false;
             }
 

@@ -43,12 +43,13 @@ step uses Sonarr's own `ManualImportCommand` — nothing internal is re-implemen
 
 | Variable | Meaning | Default |
 | --- | --- | --- |
-| `ANIRSS_SUBSCRIBE_FILE` | Path to the subscribe config JSON. Required; empty disables the patch entirely. | — |
+| `ANIRSS_SUBSCRIBE_FILE` | Path to the subscribe config JSON. Unset → `config/anirss.subscribe.json` next to the patch DLL. | `<patch DLL dir>/config/anirss.subscribe.json` |
 | `ANIRSS_INTERVAL_MINUTES` | How often the subscription pass runs. `0` disables the patch entirely. | `60` |
 | `ANIRSS_DOWNLOAD_CLIENT_NAME` | Download client to use (match by Sonarr client name). Unset → first configured client. | — |
 
-When `ANIRSS_INTERVAL_MINUTES=0` or `ANIRSS_SUBSCRIBE_FILE` is empty, `ShouldPatch()`
-returns false and the whole patch (task + import binding) is inactive.
+When `ANIRSS_INTERVAL_MINUTES=0`, `ShouldPatch()` returns false and the whole patch (task +
+import binding) is inactive. When the subscribe file is missing, the task is still registered
+but every pass skips execution (with a warning) until the file appears.
 
 ## Subscribe file
 
@@ -95,7 +96,8 @@ services:
     image: lscr.io/linuxserver/sonarr:latest
     environment:
       - DOTNET_STARTUP_HOOKS=/custom/SonarrPatcher.Loader.dll
-      - ANIRSS_SUBSCRIBE_FILE=/config/anirss_subscribe.json
+      # optional: defaults to <patch dll dir>/config/anirss.subscribe.json
+      # - ANIRSS_SUBSCRIBE_FILE=/config/anirss_subscribe.json
       - ANIRSS_INTERVAL_MINUTES=60
       - ANIRSS_DOWNLOAD_CLIENT_NAME=qBittorrent   # optional
     volumes:
