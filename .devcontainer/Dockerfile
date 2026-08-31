@@ -13,3 +13,7 @@ RUN rm -f /etc/apt/sources.list.d/yarn.list \
         jq \
         unzip \
     && rm -rf /var/lib/apt/lists/*
+
+# Pre-create the Sonarr source location so the sync script can clone into it
+# as the vscode user (the base /workspaces is root-owned).
+RUN mkdir -p /workspaces/Sonarr && chown vscode:vscode /workspaces/Sonarr

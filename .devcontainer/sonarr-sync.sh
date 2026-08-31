@@ -48,7 +48,17 @@ if [[ ! -d "$SONARR_SRC/.git" ]]; then
         exit 1
     fi
     echo "    source missing, cloning"
-    mkdir -p "$(dirname "$SONARR_SRC")"
+    PARENT="$(dirname "$SONARR_SRC")"
+    mkdir -p "$PARENT" 2>/dev/null
+    # /workspaces is owned by root in the base image; make it writable for the
+    # current user before cloning (vscode has passwordless sudo in the container).
+    if [[ ! -w "$PARENT" ]]; then
+        echo "    $PARENT not writable, fixing ownership"
+        sudo -n chown "$(id -un)" "$PARENT" || {
+            echo "error: cannot make $PARENT writable (sudo unavailable?)" >&2
+            exit 1
+        }
+    fi
     git clone --depth=1 https://github.com/Sonarr/Sonarr.git "$SONARR_SRC"
 fi
 
