@@ -99,4 +99,5 @@ jobs:
             - `dist/SonarrPatcher.Patches.SkyHook.dll` — SkyHook redirect patch (see [SkyHook/README.md](SonarrPatcher.Patches/SkyHook/README.md))
             - `dist/SonarrPatcher.Patches.NameTruncate.dll` — character-based `{name:N}` truncation patch (see [NameTruncate/README.md](SonarrPatcher.Patches/NameTruncate/README.md))
             - `dist/SonarrPatcher.Patches.XemAliases.dll` — allNames redirect + non-English alias patch (see [XemAliases/README.md](SonarrPatcher.Patches/XemAliases/README.md))
+            - `dist/SonarrPatcher.Patches.AniRss.dll` — ani-rss style scheduled-task subscription patch (see [AniRss/README.md](SonarrPatcher.Patches/AniRss/README.md))
           files: dist/*
