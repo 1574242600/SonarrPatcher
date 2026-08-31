@@ -11,6 +11,7 @@ using NzbDrone.Core.Download;
 using NzbDrone.Core.Download.Clients;
 using NzbDrone.Core.History;
 using NzbDrone.Core.Indexers;
+using NzbDrone.Core.MediaFiles.EpisodeImport.Manual;
 using NzbDrone.Core.Messaging.Commands;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Tv;
@@ -52,6 +53,8 @@ namespace SonarrPatcher.Patches.AniRss
                                      IProvideDownloadClient downloadClientProvider,
                                      IDownloadService downloadService,
                                      IHttpClient httpClient,
+                                     IManualImportService manualImportService,
+                                     IManageCommandQueue commandQueue,
                                      AniRssParser parser,
                                      Logger logger)
         {
@@ -63,6 +66,15 @@ namespace SonarrPatcher.Patches.AniRss
             _httpClient = httpClient;
             _parser = parser;
             _logger = logger;
+
+            // The executor is built by Sonarr's DI container (AutoAddServices scans this
+            // assembly), so these parameters are the same singletons the import path uses.
+            // Forwarding them here gives the import binder its services without any runtime
+            // capture - constructor postfixes are unreliable (compiled ctor calls get
+            // inlined past the Harmony detour), and there is no service locator to query.
+            AniRssImportBinder.HistoryService = historyService;
+            AniRssImportBinder.ManualImportService = manualImportService;
+            AniRssImportBinder.CommandQueue = commandQueue;
         }
 
         public void Execute(AniRssCommand message)

@@ -96,43 +96,32 @@ namespace SonarrPatcher.Patches.AniRss
         private static IManageCommandQueue _commandQueue;
         private static bool _servicesWarned;
 
-        /// <summary>DI-built history service, captured by a constructor postfix.</summary>
+        /// <summary>
+        /// DI-built history service, forwarded by <see cref="AniRssCommandExecutor"/> (which
+        /// is constructed by Sonarr's container).
+        /// </summary>
         internal static IHistoryService HistoryService
         {
             get => _historyService;
             set => _historyService = value;
         }
 
-        /// <summary>DI-built manual import service, captured by a constructor postfix.</summary>
+        /// <summary>
+        /// DI-built manual import service, forwarded by <see cref="AniRssCommandExecutor"/>.
+        /// </summary>
         internal static IManualImportService ManualImportService
         {
             get => _manualImportService;
             set => _manualImportService = value;
         }
 
-        /// <summary>DI-built command queue, captured by a constructor postfix.</summary>
+        /// <summary>
+        /// DI-built command queue, forwarded by <see cref="AniRssCommandExecutor"/>.
+        /// </summary>
         internal static IManageCommandQueue CommandQueue
         {
             get => _commandQueue;
             set => _commandQueue = value;
-        }
-
-        /// <summary>Constructor postfix that remembers the container's <c>HistoryService</c>.</summary>
-        public static void CaptureHistoryService(object __instance)
-        {
-            _historyService = __instance as IHistoryService;
-        }
-
-        /// <summary>Constructor postfix that remembers the container's <c>ManualImportService</c>.</summary>
-        public static void CaptureManualImportService(object __instance)
-        {
-            _manualImportService = __instance as IManualImportService;
-        }
-
-        /// <summary>Constructor postfix that remembers the container's <c>CommandQueueManager</c>.</summary>
-        public static void CaptureCommandQueue(object __instance)
-        {
-            _commandQueue = __instance as IManageCommandQueue;
         }
 
         /// <summary>
@@ -168,6 +157,9 @@ namespace SonarrPatcher.Patches.AniRss
                 return false;
             }
 
+            // Services are forwarded by the DI-built AniRssCommandExecutor on its first run,
+            // which always precedes any AniRss download completing. If they are still missing
+            // (e.g. standalone startup without the task), fall back to Sonarr's own import.
             if (_historyService == null || _manualImportService == null || _commandQueue == null)
             {
                 if (!_servicesWarned)

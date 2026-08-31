@@ -542,18 +542,16 @@ namespace SonarrPatcher.Tests
             Assert.NotNull(completedDownloadService);
             Assert.NotNull(AccessTools.Method(completedDownloadService, "Import", new[] { typeof(TrackedDownload) }));
 
-            foreach (var typeName in new[]
-            {
-                "NzbDrone.Core.Tv.EpisodeService",
-                "NzbDrone.Core.History.HistoryService",
-                "NzbDrone.Core.MediaFiles.EpisodeImport.Manual.ManualImportService",
-                "NzbDrone.Core.Messaging.Commands.CommandQueueManager"
-            })
-            {
-                var type = AccessTools.TypeByName(typeName);
-                Assert.NotNull(type);
-                Assert.NotNull(AccessTools.Constructor(type));
-            }
+            // The binder gets its services forwarded by AniRssCommandExecutor, which is
+            // built by Sonarr's DI container (AutoAddServices scans the patch assembly).
+            // Guard against the executor's constructor signature drifting: it must still
+            // accept the three services as injectable parameters.
+            var executorCtor = typeof(AniRssCommandExecutor).GetConstructors().Single();
+            Assert.Contains(executorCtor.GetParameters(), p => p.ParameterType == typeof(IHistoryService));
+            Assert.Contains(executorCtor.GetParameters(), p => p.ParameterType == typeof(IManualImportService));
+            Assert.Contains(executorCtor.GetParameters(), p => p.ParameterType == typeof(IManageCommandQueue));
+
+            Assert.NotNull(typeof(AniRssImportBinder).GetMethod(nameof(AniRssImportBinder.ImportPrefix), BindingFlags.Public | BindingFlags.Static));
         }
 
         private static void Bind(FakeHistoryService history, FakeManualImportService manual, FakeCommandQueue queue)

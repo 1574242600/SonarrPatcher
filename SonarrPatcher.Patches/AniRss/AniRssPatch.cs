@@ -91,9 +91,10 @@ namespace SonarrPatcher.Patches.AniRss
 
         /// <summary>
         /// Takes finished AniRss downloads away from Sonarr's automatic import and hands
-        /// them to the manual-import command with the episodes AniRss grabbed, and captures
-        /// the services that command needs. There is no service locator in Sonarr, so the
-        /// container-built instances are picked up through constructor postfixes.
+        /// them to the manual-import command with the episodes AniRss grabbed. The services
+        /// that command needs are forwarded by <see cref="AniRssCommandExecutor"/>, which is
+        /// constructed by Sonarr's DI container (AutoAddServices scans this assembly), so no
+        /// runtime service capture is required.
         /// </summary>
         private static void PatchManualImport(Harmony harmony)
         {
@@ -109,24 +110,6 @@ namespace SonarrPatcher.Patches.AniRss
             }
 
             harmony.Patch(importMethod, prefix: Method(nameof(AniRssImportBinder.ImportPrefix)));
-
-            CaptureService(harmony, "NzbDrone.Core.History.HistoryService", Method(nameof(AniRssImportBinder.CaptureHistoryService)));
-            CaptureService(harmony, "NzbDrone.Core.MediaFiles.EpisodeImport.Manual.ManualImportService", Method(nameof(AniRssImportBinder.CaptureManualImportService)));
-            CaptureService(harmony, "NzbDrone.Core.Messaging.Commands.CommandQueueManager", Method(nameof(AniRssImportBinder.CaptureCommandQueue)));
-        }
-
-        private static void CaptureService(Harmony harmony, string typeName, HarmonyMethod postfix)
-        {
-            var type = AccessTools.TypeByName(typeName);
-            var ctor = type == null ? null : AccessTools.Constructor(type);
-
-            if (ctor == null)
-            {
-                Log.Warn(typeName + " constructor not found, AniRss manual import disabled");
-                return;
-            }
-
-            harmony.Patch(ctor, postfix: postfix);
         }
 
         private static HarmonyMethod Method(string methodName)
