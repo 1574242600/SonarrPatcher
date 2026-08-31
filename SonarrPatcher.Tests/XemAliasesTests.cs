@@ -47,7 +47,7 @@ namespace SonarrPatcher.Tests
 
             Unpatch();
             SetAllNamesUrl(null);
-            Environment.SetEnvironmentVariable("DISABLE_NONENGLISH_ALIASES_PATCH", null);
+            SetDisableEnglishFilter(false);
 
             // Before the patch: ASCII-only (CJK rejected, long ASCII accepted).
             Assert.False(InvokeIsEnglish(type, method, "無職転生"));
@@ -91,7 +91,7 @@ namespace SonarrPatcher.Tests
 
             Unpatch();
             SetAllNamesUrl("http://xem.example.org/map/allNames");
-            Environment.SetEnvironmentVariable("DISABLE_NONENGLISH_ALIASES_PATCH", null);
+            SetDisableEnglishFilter(false);
 
             try
             {
@@ -118,7 +118,7 @@ namespace SonarrPatcher.Tests
 
             Unpatch();
             SetAllNamesUrl(null);
-            Environment.SetEnvironmentVariable("DISABLE_NONENGLISH_ALIASES_PATCH", "1");
+            SetDisableEnglishFilter(true);
 
             try
             {
@@ -132,7 +132,7 @@ namespace SonarrPatcher.Tests
             }
             finally
             {
-                Environment.SetEnvironmentVariable("DISABLE_NONENGLISH_ALIASES_PATCH", null);
+                SetDisableEnglishFilter(false);
                 Unpatch();
             }
         }
@@ -198,6 +198,13 @@ namespace SonarrPatcher.Tests
         private static void SetAllNamesUrl(string url)
         {
             typeof(XemAliases).GetField("_allNamesUrl", BindingFlags.NonPublic | BindingFlags.Static).SetValue(null, url);
+        }
+
+        // The patch reads its config in the static constructor, so tests reset the
+        // captured static state (instead of flipping the env var at run time).
+        private static void SetDisableEnglishFilter(bool disabled)
+        {
+            typeof(XemAliases).GetField("_disableEnglishFilter", BindingFlags.NonPublic | BindingFlags.Static).SetValue(null, disabled);
         }
 
         private static void Unpatch()

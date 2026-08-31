@@ -81,7 +81,13 @@ namespace SonarrPatcher.Patches.AniRss
             ImportRejectionReason.NotCustomFormatUpgrade
         };
 
-        private static readonly ILogger Log = new Logger("AniRssPatch");
+        /// <summary>
+        /// Logger shared with <see cref="AniRssPatch"/> (same prefix), created
+        /// automatically from the patch name when the patch type is initialized.
+        /// Safe to use from the binder's Harmony methods: they only run after
+        /// <c>AniRssPatch</c> was applied, so its static constructor has run.
+        /// </summary>
+        private static ILogger Log => AniRssPatch.Log;
 
         private static readonly ConcurrentDictionary<string, DateTime> Queued = new ConcurrentDictionary<string, DateTime>();
 
@@ -173,9 +179,7 @@ namespace SonarrPatcher.Patches.AniRss
                 return false;
             }
 
-            var grabbed = (_historyService.FindByDownloadId(downloadId) ?? new List<EpisodeHistory>())
-                .Where(h => h.EventType == EpisodeHistoryEventType.Grabbed)
-                .ToList();
+            var grabbed = GetAniRssGrabbedHistory(downloadId);
 
             // Only ever take over releases AniRss itself pushed.
             if (!grabbed.Any(h => IsAniRssTitle(h.SourceTitle)))
@@ -292,6 +296,17 @@ namespace SonarrPatcher.Patches.AniRss
             var rejections = item.Rejections;
 
             return rejections == null || rejections.All(r => OverridableReasons.Contains(r.Reason));
+        }
+
+        /// <summary>
+        /// The grabbed history entries for a download. Non-AniRss downloads have no
+        /// marker in any entry and are therefore left to Sonarr's automatic import.
+        /// </summary>
+        private static List<EpisodeHistory> GetAniRssGrabbedHistory(string downloadId)
+        {
+            return (_historyService.FindByDownloadId(downloadId) ?? new List<EpisodeHistory>())
+                .Where(h => h.EventType == EpisodeHistoryEventType.Grabbed)
+                .ToList();
         }
 
         /// <summary>True when a release/history title was produced by AniRss.</summary>

@@ -1,8 +1,6 @@
 using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
-using System.Text;
 using HarmonyLib;
 using SonarrPatcher.Common;
 using SonarrPatcher.Patches;
@@ -19,12 +17,14 @@ namespace SonarrPatcher.Patches.NameTruncate
     /// </summary>
     public sealed class NameTruncate : Patch
     {
+        /// <summary>Characters reserved for the trailing "{ellipsis}" placeholder.</summary>
+        private const int EllipsisLength = 3;
+
         private static bool _disabled;
 
         static NameTruncate()
         {
             Name = "NameTruncatePatch";
-            Log = new Logger(Name);
             _disabled = Environment.GetEnvironmentVariable("DISABLE_NAMETRUNCATE_PATCH") == "1";
         }
 
@@ -35,17 +35,8 @@ namespace SonarrPatcher.Patches.NameTruncate
 
         protected override void Apply(Harmony harmony)
         {
-            var builderType = AccessTools.TypeByName("NzbDrone.Core.Organizer.FileNameBuilder");
-            if (builderType == null)
-            {
-                throw new InvalidOperationException("FileNameBuilder type not found");
-            }
-
-            var truncate = AccessTools.DeclaredMethod(builderType, "Truncate", new[] { typeof(string), typeof(string) });
-            if (truncate == null)
-            {
-                throw new InvalidOperationException("FileNameBuilder.Truncate(string,string) not found");
-            }
+            var builderType = ReflectionHelper.RequireType(AccessTools.TypeByName("NzbDrone.Core.Organizer.FileNameBuilder"), "FileNameBuilder");
+            var truncate = ReflectionHelper.RequireMethod(AccessTools.DeclaredMethod(builderType, "Truncate", new[] { typeof(string), typeof(string) }), "FileNameBuilder.Truncate(string,string)");
 
             var prefix = typeof(NameTruncate).GetMethod(nameof(TruncatePrefix), BindingFlags.NonPublic | BindingFlags.Static);
             harmony.Patch(truncate, prefix: new HarmonyMethod(prefix));
@@ -81,75 +72,55 @@ namespace SonarrPatcher.Patches.NameTruncate
                 return input;
             }
 
-            if (TextElementCount(input) <= Math.Abs(maxLength))
+            // Single pass over the grapheme-cluster boundaries: each entry is the char
+            // index where a text element starts, so element i spans
+            // boundaries[i] .. (i == Length - 1 ? input.Length : boundaries[i + 1]).
+            var boundaries = StringInfo.ParseCombiningCharacters(input);
+            var limit = Math.Abs(maxLength);
+
+            if (boundaries.Length <= limit)
             {
                 return input;
             }
 
             if (maxLength < 0)
             {
-                return "{ellipsis}" + LastTextElements(input, Math.Abs(maxLength) - 3).TrimStart(' ', '.');
+                return "{ellipsis}" + LastTextElements(input, boundaries, limit - EllipsisLength).TrimStart(' ', '.');
             }
 
-            return FirstTextElements(input, maxLength - 3).TrimEnd(' ', '.') + "{ellipsis}";
+            return FirstTextElements(input, boundaries, maxLength - EllipsisLength).TrimEnd(' ', '.') + "{ellipsis}";
         }
 
-        private static int TextElementCount(string s)
-        {
-            var enumerator = StringInfo.GetTextElementEnumerator(s);
-            var count = 0;
-            while (enumerator.MoveNext())
-            {
-                count++;
-            }
-
-            return count;
-        }
-
-        private static string FirstTextElements(string s, int count)
+        private static string FirstTextElements(string s, int[] boundaries, int count)
         {
             if (count <= 0)
             {
                 return string.Empty;
             }
 
-            var builder = new StringBuilder();
-            var enumerator = StringInfo.GetTextElementEnumerator(s);
-            while (enumerator.MoveNext() && count-- > 0)
+            if (count >= boundaries.Length)
             {
-                builder.Append(enumerator.GetTextElement());
+                return s;
             }
 
-            return builder.ToString();
+            // boundaries[count] is where the (count + 1)-th element starts,
+            // so taking everything before it yields exactly `count` elements.
+            return s.Substring(0, boundaries[count]);
         }
 
-        private static string LastTextElements(string s, int count)
+        private static string LastTextElements(string s, int[] boundaries, int count)
         {
             if (count <= 0)
             {
                 return string.Empty;
             }
 
-            var elements = new List<string>();
-            var enumerator = StringInfo.GetTextElementEnumerator(s);
-            while (enumerator.MoveNext())
+            if (count >= boundaries.Length)
             {
-                elements.Add(enumerator.GetTextElement());
+                return s;
             }
 
-            var start = elements.Count - count;
-            if (start < 0)
-            {
-                start = 0;
-            }
-
-            var builder = new StringBuilder();
-            for (var i = start; i < elements.Count; i++)
-            {
-                builder.Append(elements[i]);
-            }
-
-            return builder.ToString();
+            return s.Substring(boundaries[boundaries.Length - count]);
         }
     }
 }

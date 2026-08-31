@@ -17,56 +17,43 @@ namespace SonarrPatcher.Patches.XemAliases
     /// </summary>
     public sealed class XemAliases : Patch
     {
+        /// <summary>
+        /// Sonarr's own exception for Fate/Zero (tvdb 79151): the seasons after the
+        /// first are a different show, so only season 1 aliases are mapped.
+        /// </summary>
+        private const int FateZeroTvdbId = 79151;
+
         private static string _allNamesUrl;
+        private static bool _disableEnglishFilter;
 
         static XemAliases()
         {
             Name = "XemAliasesPatch";
-            Log = new Logger(Name);
             _allNamesUrl = Environment.GetEnvironmentVariable("XEM_ALLNAMES_URL");
+            _disableEnglishFilter = Environment.GetEnvironmentVariable("DISABLE_NONENGLISH_ALIASES_PATCH") == "1";
         }
 
         public override bool ShouldPatch()
         {
-            var disableEnglishFilter = Environment.GetEnvironmentVariable("DISABLE_NONENGLISH_ALIASES_PATCH") == "1";
-
-            return !string.IsNullOrEmpty(_allNamesUrl) || !disableEnglishFilter;
+            return !string.IsNullOrEmpty(_allNamesUrl) || !_disableEnglishFilter;
         }
 
         protected override void Apply(Harmony harmony)
         {
             if (!string.IsNullOrEmpty(_allNamesUrl))
             {
-                var xemProxyType = AccessTools.TypeByName("NzbDrone.Core.DataAugmentation.Xem.XemProxy");
-                if (xemProxyType == null)
-                {
-                    throw new InvalidOperationException("XemProxy type not found");
-                }
-
-                var getSceneTvdbNames = AccessTools.DeclaredMethod(xemProxyType, "GetSceneTvdbNames");
-                if (getSceneTvdbNames == null)
-                {
-                    throw new InvalidOperationException("XemProxy.GetSceneTvdbNames not found");
-                }
+                var xemProxyType = ReflectionHelper.RequireType(AccessTools.TypeByName("NzbDrone.Core.DataAugmentation.Xem.XemProxy"), "XemProxy");
+                var getSceneTvdbNames = ReflectionHelper.RequireMethod(AccessTools.DeclaredMethod(xemProxyType, "GetSceneTvdbNames"), "XemProxy.GetSceneTvdbNames");
 
                 var prefix = typeof(XemAliases).GetMethod(nameof(GetSceneTvdbNamesPrefix), BindingFlags.NonPublic | BindingFlags.Static);
                 harmony.Patch(getSceneTvdbNames, prefix: new HarmonyMethod(prefix));
                 Log.Info("Patched XemProxy.GetSceneTvdbNames to redirect allNames to " + _allNamesUrl);
             }
 
-            if (Environment.GetEnvironmentVariable("DISABLE_NONENGLISH_ALIASES_PATCH") != "1")
+            if (!_disableEnglishFilter)
             {
-                var sceneMappingServiceType = AccessTools.TypeByName("NzbDrone.Core.DataAugmentation.Scene.SceneMappingService");
-                if (sceneMappingServiceType == null)
-                {
-                    throw new InvalidOperationException("SceneMappingService type not found");
-                }
-
-                var isEnglish = AccessTools.DeclaredMethod(sceneMappingServiceType, "IsEnglish", new[] { typeof(string) });
-                if (isEnglish == null)
-                {
-                    throw new InvalidOperationException("SceneMappingService.IsEnglish not found");
-                }
+                var sceneMappingServiceType = ReflectionHelper.RequireType(AccessTools.TypeByName("NzbDrone.Core.DataAugmentation.Scene.SceneMappingService"), "SceneMappingService");
+                var isEnglish = ReflectionHelper.RequireMethod(AccessTools.DeclaredMethod(sceneMappingServiceType, "IsEnglish", new[] { typeof(string) }), "SceneMappingService.IsEnglish");
 
                 var prefix = typeof(XemAliases).GetMethod(nameof(IsEnglishPrefix), BindingFlags.NonPublic | BindingFlags.Static);
                 harmony.Patch(isEnglish, prefix: new HarmonyMethod(prefix));
@@ -103,7 +90,7 @@ namespace SonarrPatcher.Patches.XemAliases
         {
             try
             {
-                var httpClient = GetInstanceField(__instance, "_httpClient");
+                var httpClient = ReflectionHelper.GetInstanceField(__instance, "_httpClient");
                 var request = BuildAllNamesRequest(_allNamesUrl);
                 var response = ExecuteGet(httpClient, request);
                 var data = GetResponseData(response);
@@ -119,11 +106,7 @@ namespace SonarrPatcher.Patches.XemAliases
 
         private static object BuildAllNamesRequest(string allNamesUrl)
         {
-            var builderType = AccessTools.TypeByName("NzbDrone.Common.Http.HttpRequestBuilder");
-            if (builderType == null)
-            {
-                throw new InvalidOperationException("HttpRequestBuilder type not found");
-            }
+            var builderType = ReflectionHelper.RequireType(AccessTools.TypeByName("NzbDrone.Common.Http.HttpRequestBuilder"), "HttpRequestBuilder");
 
             var builder = Activator.CreateInstance(builderType, allNamesUrl);
 
@@ -157,11 +140,7 @@ namespace SonarrPatcher.Patches.XemAliases
                 throw new InvalidOperationException("IHttpClient.Get<T> not found");
             }
 
-            var xemResultType = AccessTools.TypeByName("NzbDrone.Core.DataAugmentation.Xem.Model.XemResult`1");
-            if (xemResultType == null)
-            {
-                throw new InvalidOperationException("XemResult<T> type not found");
-            }
+            var xemResultType = ReflectionHelper.RequireType(AccessTools.TypeByName("NzbDrone.Core.DataAugmentation.Xem.Model.XemResult`1"), "XemResult<T>");
 
             var generic = xemResultType.MakeGenericType(typeof(Dictionary<int, List<JObject>>));
             var closedGet = getMethod.MakeGenericMethod(generic);
@@ -182,11 +161,7 @@ namespace SonarrPatcher.Patches.XemAliases
 
         private static object ParseMappings(Dictionary<int, List<JObject>> data)
         {
-            var sceneMappingType = AccessTools.TypeByName("NzbDrone.Core.DataAugmentation.Scene.SceneMapping");
-            if (sceneMappingType == null)
-            {
-                throw new InvalidOperationException("SceneMapping type not found");
-            }
+            var sceneMappingType = ReflectionHelper.RequireType(AccessTools.TypeByName("NzbDrone.Core.DataAugmentation.Scene.SceneMapping"), "SceneMapping");
 
             var result = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(sceneMappingType));
 
@@ -194,25 +169,20 @@ namespace SonarrPatcher.Patches.XemAliases
             {
                 foreach (var name in series.Value)
                 {
-                    foreach (var n in name)
+                    foreach (var property in name)
                     {
-                        if (!int.TryParse(n.Value.ToString(), out var seasonNumber))
+                        if (!int.TryParse(property.Value.ToString(), out var seasonNumber))
                         {
                             continue;
                         }
 
-                        // hack to deal with Fate/Zero
-                        if (series.Key == 79151 && seasonNumber > 1)
+                        // Fate/Zero hack: seasons after 1 belong to a different show.
+                        if (series.Key == FateZeroTvdbId && seasonNumber > 1)
                         {
                             continue;
                         }
 
-                        var mapping = Activator.CreateInstance(sceneMappingType);
-                        sceneMappingType.GetProperty("Title").SetValue(mapping, n.Key);
-                        sceneMappingType.GetProperty("SearchTerm").SetValue(mapping, n.Key);
-                        sceneMappingType.GetProperty("SceneSeasonNumber").SetValue(mapping, seasonNumber);
-                        sceneMappingType.GetProperty("TvdbId").SetValue(mapping, series.Key);
-                        result.Add(mapping);
+                        result.Add(CreateMapping(sceneMappingType, series.Key, property.Key, seasonNumber));
                     }
                 }
             }
@@ -220,15 +190,14 @@ namespace SonarrPatcher.Patches.XemAliases
             return result;
         }
 
-        private static object GetInstanceField(object instance, string fieldName)
+        private static object CreateMapping(Type sceneMappingType, int tvdbId, string title, int seasonNumber)
         {
-            var field = instance.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (field == null)
-            {
-                throw new InvalidOperationException(instance.GetType().Name + "." + fieldName + " not found");
-            }
-
-            return field.GetValue(instance);
+            var mapping = Activator.CreateInstance(sceneMappingType);
+            sceneMappingType.GetProperty("Title").SetValue(mapping, title);
+            sceneMappingType.GetProperty("SearchTerm").SetValue(mapping, title);
+            sceneMappingType.GetProperty("SceneSeasonNumber").SetValue(mapping, seasonNumber);
+            sceneMappingType.GetProperty("TvdbId").SetValue(mapping, tvdbId);
+            return mapping;
         }
     }
 }

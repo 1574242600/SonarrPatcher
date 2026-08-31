@@ -21,21 +21,24 @@ namespace SonarrPatcher.Patches.AniRss
     public sealed class AniRssPatch : Patch
     {
         private static int _intervalMinutes;
-        public static string subscribeFile;
-        public static string downClientName;
+
+        /// <summary>Subscribe config file path (<c>ANIRSS_SUBSCRIBE_FILE</c>).</summary>
+        public static string SubscribeFile { get; private set; }
+
+        /// <summary>Download client name (<c>ANIRSS_DOWNLOAD_CLIENT_NAME</c>); empty means first configured client.</summary>
+        public static string DownloadClientName { get; private set; }
 
         static AniRssPatch()
         {
             Name = "AniRssPatch";
-            Log = new Logger(Name);
             _intervalMinutes = int.TryParse(Environment.GetEnvironmentVariable("ANIRSS_INTERVAL_MINUTES"), out var interval) ? interval : 60;
-            subscribeFile = Environment.GetEnvironmentVariable("ANIRSS_SUBSCRIBE_FILE");
-            downClientName = Environment.GetEnvironmentVariable("ANIRSS_DOWNLOAD_CLIENT_NAME");
+            SubscribeFile = Environment.GetEnvironmentVariable("ANIRSS_SUBSCRIBE_FILE");
+            DownloadClientName = Environment.GetEnvironmentVariable("ANIRSS_DOWNLOAD_CLIENT_NAME");
         }
 
         public override bool ShouldPatch()
         {
-            if (_intervalMinutes == 0 || string.IsNullOrWhiteSpace(subscribeFile))
+            if (_intervalMinutes == 0 || string.IsNullOrWhiteSpace(SubscribeFile))
             {
                 Log.Info("AniRss disabled (ANIRSS_INTERVAL_MINUTES=0 or ANIRSS_SUBSCRIBE_FILE empty)");
                 return false;
@@ -46,37 +49,33 @@ namespace SonarrPatcher.Patches.AniRss
 
         protected override void Apply(Harmony harmony)
         {
-            var assemblyLoaderType = AccessTools.TypeByName("NzbDrone.Common.Composition.AssemblyLoader");
-            if (assemblyLoaderType == null)
-            {
-                throw new InvalidOperationException("AssemblyLoader type not found");
-            }
-
-            var loadMethod = AccessTools.Method(assemblyLoaderType, "Load");
-            if (loadMethod == null)
-            {
-                throw new InvalidOperationException("AssemblyLoader.Load not found");
-            }
-
-            harmony.Patch(loadMethod, postfix: new HarmonyMethod(typeof(AniRssPatch).GetMethod(nameof(AssemblyLoaderLoadPostfix), BindingFlags.NonPublic | BindingFlags.Static)));
-
-            var taskManagerType = AccessTools.TypeByName("NzbDrone.Core.Jobs.TaskManager");
-            if (taskManagerType == null)
-            {
-                throw new InvalidOperationException("TaskManager type not found");
-            }
-
-            var handleMethod = AccessTools.Method(taskManagerType, "Handle", new[] { typeof(ApplicationStartedEvent) });
-            if (handleMethod == null)
-            {
-                throw new InvalidOperationException("TaskManager.Handle not found");
-            }
-
-            harmony.Patch(handleMethod, postfix: new HarmonyMethod(typeof(AniRssPatch).GetMethod(nameof(TaskManagerHandlePostfix), BindingFlags.NonPublic | BindingFlags.Static)));
-
+            PatchAssemblyLoader(harmony);
+            PatchTaskManager(harmony);
             PatchManualImport(harmony);
 
             Log.Info("Patch applied. interval=" + _intervalMinutes + " min");
+        }
+
+        /// <summary>
+        /// Appends this assembly to the list of assemblies Sonarr scans at startup
+        /// (AutoAddServices). This makes <see cref="AniRssCommand"/> visible to
+        /// KnownTypes and registers <see cref="AniRssCommandExecutor"/> for
+        /// IExecute&lt;AniRssCommand&gt; without any further patching.
+        /// </summary>
+        private static void PatchAssemblyLoader(Harmony harmony)
+        {
+            var assemblyLoaderType = ReflectionHelper.RequireType(AccessTools.TypeByName("NzbDrone.Common.Composition.AssemblyLoader"), "AssemblyLoader");
+            var loadMethod = ReflectionHelper.RequireMethod(AccessTools.Method(assemblyLoaderType, "Load"), "AssemblyLoader.Load");
+
+            harmony.Patch(loadMethod, postfix: new HarmonyMethod(typeof(AniRssPatch).GetMethod(nameof(AssemblyLoaderLoadPostfix), BindingFlags.NonPublic | BindingFlags.Static)));
+        }
+
+        private static void PatchTaskManager(Harmony harmony)
+        {
+            var taskManagerType = ReflectionHelper.RequireType(AccessTools.TypeByName("NzbDrone.Core.Jobs.TaskManager"), "TaskManager");
+            var handleMethod = ReflectionHelper.RequireMethod(AccessTools.Method(taskManagerType, "Handle", new[] { typeof(ApplicationStartedEvent) }), "TaskManager.Handle");
+
+            harmony.Patch(handleMethod, postfix: new HarmonyMethod(typeof(AniRssPatch).GetMethod(nameof(TaskManagerHandlePostfix), BindingFlags.NonPublic | BindingFlags.Static)));
         }
 
         /// <summary>
@@ -124,12 +123,6 @@ namespace SonarrPatcher.Patches.AniRss
             return new HarmonyMethod(typeof(AniRssImportBinder).GetMethod(methodName, BindingFlags.Public | BindingFlags.Static));
         }
 
-        /// <summary>
-        /// Appends this assembly to the list of assemblies Sonarr scans at startup
-        /// (AutoAddServices). This makes <see cref="AniRssCommand"/> visible to
-        /// KnownTypes and registers <see cref="AniRssCommandExecutor"/> for
-        /// IExecute&lt;AniRssCommand&gt; without any further patching.
-        /// </summary>
         private static void AssemblyLoaderLoadPostfix(IList<Assembly> __result)
         {
             var asm = typeof(AniRssCommand).Assembly;
@@ -145,8 +138,15 @@ namespace SonarrPatcher.Patches.AniRss
         /// </summary>
         private static void TaskManagerHandlePostfix(object __instance)
         {
-            var repository = GetField(__instance, "_scheduledTaskRepository") as IScheduledTaskRepository;
-            var cache = GetField(__instance, "_cache") as ICached<ScheduledTask>;
+            // Missing fields or uncaptured services degrade to a warning, never an
+            // exception: a patched TaskManager must not break Sonarr's startup.
+            var repository = ReflectionHelper.TryGetInstanceField(__instance, "_scheduledTaskRepository", out var repositoryValue)
+                ? repositoryValue as IScheduledTaskRepository
+                : null;
+            var cache = ReflectionHelper.TryGetInstanceField(__instance, "_cache", out var cacheValue)
+                ? cacheValue as ICached<ScheduledTask>
+                : null;
+
             if (repository == null || cache == null)
             {
                 Log.Warn("TaskManager fields not found, AniRss task not registered");
@@ -164,12 +164,6 @@ namespace SonarrPatcher.Patches.AniRss
             repository.Upsert(task);
             cache.Set(task.TypeName, task);
             Log.Info("AniRss task registered. interval=" + _intervalMinutes + " min");
-        }
-
-        private static object GetField(object instance, string fieldName)
-        {
-            var field = instance.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            return field?.GetValue(instance);
         }
     }
 }

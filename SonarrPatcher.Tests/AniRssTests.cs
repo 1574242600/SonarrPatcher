@@ -74,6 +74,37 @@ namespace SonarrPatcher.Tests
         }
 
         [Fact]
+        public void LatestGrabByEpisodeId_PicksNewestEntryPerEpisode()
+        {
+            var older = new EpisodeHistory { EpisodeId = 5, Date = new DateTime(2026, 1, 1), SourceTitle = "[G] Show 03" };
+            var newer = new EpisodeHistory { EpisodeId = 5, Date = new DateTime(2026, 2, 1), SourceTitle = "[G] Show 03 #ANIRSS1" };
+            var other = new EpisodeHistory { EpisodeId = 6, Date = new DateTime(2026, 3, 1), SourceTitle = "[G] Show 04 #ANIRSS0" };
+
+            var latest = AniRssCommandExecutor.LatestGrabByEpisodeId(new List<EpisodeHistory> { older, newer, other });
+
+            Assert.Equal(2, latest.Count);
+            Assert.Same(newer, latest[5]);
+            Assert.Same(other, latest[6]);
+        }
+
+        [Fact]
+        public void LatestGrabByEpisodeId_EmptyHistory_ReturnsEmpty()
+        {
+            Assert.Empty(AniRssCommandExecutor.LatestGrabByEpisodeId(new List<EpisodeHistory>()));
+        }
+
+        [Fact]
+        public void LatestGrabByEpisodeId_KeepsFirstEntryOnEqualDates()
+        {
+            var first = new EpisodeHistory { EpisodeId = 5, Date = new DateTime(2026, 1, 1), SourceTitle = "[G] Show 03 #ANIRSS1" };
+            var sameDate = new EpisodeHistory { EpisodeId = 5, Date = first.Date, SourceTitle = "[G] Show 03 #ANIRSS2" };
+
+            var latest = AniRssCommandExecutor.LatestGrabByEpisodeId(new List<EpisodeHistory> { first, sameDate });
+
+            Assert.Same(first, latest[5]);
+        }
+
+        [Fact]
         public void SubscribeConfig_SerializesFormattedJson_RoundTrips()
         {
             var config = new List<AniRssSubscribeItem>
@@ -387,6 +418,14 @@ namespace SonarrPatcher.Tests
 
         private static void Bind(FakeHistoryService history, FakeManualImportService manual, FakeCommandQueue queue)
         {
+            // The binder shares AniRssPatch's logger (AniRssPatch.Log); ensure the
+            // patch type's static constructor has run so that logger exists. In
+            // production the patch is always applied before the binder runs.
+            // NB: accessing an inherited static member (e.g. AniRssPatch.Name) does
+            // NOT run the derived type's static constructor, hence the instance
+            // creation here.
+            _ = new AniRssPatch();
+
             AniRssImportBinder.HistoryService = history;
             AniRssImportBinder.ManualImportService = manual;
             AniRssImportBinder.CommandQueue = queue;
