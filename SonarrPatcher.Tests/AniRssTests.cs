@@ -187,6 +187,101 @@ namespace SonarrPatcher.Tests
         }
 
         [SkippableFact]
+        public void RssParser_MikanTorrentPubDate_UsesRealDate()
+        {
+            // Regression: Mikan publishes the date inside the namespaced
+            // <torrent xmlns="https://mikanani.me/0.1/"><pubDate> element. Sonarr's base
+            // parser only reads the item-level <pubDate>, so without the override the
+            // whole feed fails with "Each item in the RSS feed must have a pubDate...".
+            // Feed content mirrors the real mikanani.me/RSS/Bangumi response.
+            SkipIfSonarrMissing();
+
+            const string rss = @"<?xml version=""1.0"" encoding=""UTF-8""?>
+<rss version=""2.0"">
+  <channel>
+    <title>Mikan Project - Seihantai na Kimi to Boku S02</title>
+    <item>
+      <guid isPermaLink=""false"">[ANi] Seihantai na Kimi to Boku S02 /  相反的你和我 第二季 - 21 [1080P][Baha][WEB-DL][AAC AVC][CHT][MP4]</guid>
+      <link>https://mikanani.me/Home/Episode/117b6129581ae0d5737f851b40d5b445f07ad888</link>
+      <title>[ANi] Seihantai na Kimi to Boku S02 /  相反的你和我 第二季 - 21 [1080P][Baha][WEB-DL][AAC AVC][CHT][MP4]</title>
+      <description>[ANi] Seihantai na Kimi to Boku S02 /  相反的你和我 第二季 - 21 [1080P][Baha][WEB-DL][AAC AVC][CHT][MP4][285.4 MB]</description>
+      <torrent xmlns=""https://mikanani.me/0.1/"">
+        <link>https://mikanani.me/Home/Episode/117b6129581ae0d5737f851b40d5b445f07ad888</link>
+        <contentLength>299263584</contentLength>
+        <pubDate>2026-08-30T16:30:48.937719</pubDate>
+      </torrent>
+      <enclosure type=""application/x-bittorrent"" length=""299263584"" url=""https://mikanani.me/Download/20260830/117b6129581ae0d5737f851b40d5b445f07ad888.torrent"" />
+    </item>
+  </channel>
+</rss>";
+
+            var torrent = ParseSingleTorrent(rss);
+
+            Assert.Equal("[ANi] Seihantai na Kimi to Boku S02 /  相反的你和我 第二季 - 21 [1080P][Baha][WEB-DL][AAC AVC][CHT][MP4]", torrent.Title);
+            Assert.Equal("https://mikanani.me/Download/20260830/117b6129581ae0d5737f851b40d5b445f07ad888.torrent", torrent.DownloadUrl);
+            Assert.Equal(299263584, torrent.Size);
+
+            // The date comes from the namespaced <torrent><pubDate> (UTC, no timezone
+            // suffix). Sub-second ticks are dropped before comparison.
+            Assert.Equal(DateTimeKind.Utc, torrent.PublishDate.Kind);
+            Assert.Equal(new DateTime(2026, 8, 30, 16, 30, 48, DateTimeKind.Utc), TruncateToSecond(torrent.PublishDate));
+        }
+
+        [SkippableFact]
+        public void RssParser_MixedFeed_MissingOrInvalidPubDatesStillParse()
+        {
+            // Regression: a single item without a usable date must not abort the whole
+            // feed (Sonarr re-throws UnsupportedFeedException on the first bad item).
+            SkipIfSonarrMissing();
+
+            const string rss = @"<?xml version=""1.0"" encoding=""UTF-8""?>
+<rss version=""2.0"">
+  <channel>
+    <title>Feed</title>
+    <item>
+      <title>[Group] Show 01 [1080p]</title>
+      <link>https://feed.example/ep-01</link>
+      <guid>ep-01</guid>
+      <torrent xmlns=""https://mikanani.me/0.1/"">
+        <pubDate>2026-08-16T16:30:45.342404</pubDate>
+      </torrent>
+      <enclosure type=""application/x-bittorrent"" length=""1000"" url=""https://tracker.example/ep-01.torrent"" />
+    </item>
+    <item>
+      <title>[Group] Show 02 [1080p]</title>
+      <link>https://feed.example/ep-02</link>
+      <guid>ep-02</guid>
+      <enclosure type=""application/x-bittorrent"" length=""2000"" url=""https://tracker.example/ep-02.torrent"" />
+    </item>
+    <item>
+      <title>[Group] Show 03 [1080p]</title>
+      <link>https://feed.example/ep-03</link>
+      <guid>ep-03</guid>
+      <pubDate>not a date</pubDate>
+      <enclosure type=""application/x-bittorrent"" length=""3000"" url=""https://tracker.example/ep-03.torrent"" />
+    </item>
+  </channel>
+</rss>";
+
+            var parser = new AniRssParser();
+            var request = new HttpRequest("https://feed.example/rss", HttpAccept.Rss);
+            var httpResponse = new HttpResponse(request, new HttpHeader(), rss);
+            var response = new IndexerResponse(new IndexerRequest(request), httpResponse);
+            var torrents = parser.ParseResponse(response).OfType<TorrentInfo>().ToList();
+
+            Assert.Equal(3, torrents.Count);
+
+            // Mikan-style namespaced date is recovered.
+            Assert.Equal(new DateTime(2026, 8, 16, 16, 30, 45, DateTimeKind.Utc), TruncateToSecond(torrents[0].PublishDate));
+
+            // Missing and invalid dates fall back to "now" instead of failing the feed.
+            Assert.True((DateTime.UtcNow - torrents[1].PublishDate).Duration() < TimeSpan.FromSeconds(60),
+                "expected a recent fallback date, got " + torrents[1].PublishDate);
+            Assert.True((DateTime.UtcNow - torrents[2].PublishDate).Duration() < TimeSpan.FromSeconds(60),
+                "expected a recent fallback date, got " + torrents[2].PublishDate);
+        }
+
+        [SkippableFact]
         public void AssemblyLoader_AddsAniRssAssemblyToResult()
         {
             var commonPath = Path.Combine(AppContext.BaseDirectory, "Sonarr.Common.dll");
@@ -491,6 +586,20 @@ namespace SonarrPatcher.Tests
             {
                 AssemblyLoadContext.Default.LoadFromAssemblyPath(path);
             }
+        }
+
+        private static TorrentInfo ParseSingleTorrent(string rss)
+        {
+            var parser = new AniRssParser();
+            var request = new HttpRequest("https://feed.example/rss", HttpAccept.Rss);
+            var httpResponse = new HttpResponse(request, new HttpHeader(), rss);
+            var response = new IndexerResponse(new IndexerRequest(request), httpResponse);
+            return parser.ParseResponse(response).OfType<TorrentInfo>().Single();
+        }
+
+        private static DateTime TruncateToSecond(DateTime dateTime)
+        {
+            return new DateTime(dateTime.Ticks - (dateTime.Ticks % TimeSpan.TicksPerSecond), DateTimeKind.Utc);
         }
     }
 }
