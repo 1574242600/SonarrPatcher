@@ -18,5 +18,10 @@
     }
   },
   "workspaceFolder": "/workspaces/SonarrPatcher",
-  "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/SonarrPatcher,type=bind"
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/SonarrPatcher,type=bind",
+  "remoteUser": "vscode",
+  "postStartCommand": [
+    "bash",
+    "/workspaces/SonarrPatcher/.devcontainer/sonarr-sync.sh"
+  ]
 }
