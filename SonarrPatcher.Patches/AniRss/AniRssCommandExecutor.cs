@@ -247,9 +247,13 @@ namespace SonarrPatcher.Patches.AniRss
         }
 
         /// <summary>
-        /// Decides whether an episode that already has a file should be left alone:
-        /// files not grabbed by ANIRSS are never touched, and an ANIRSS-grabbed file
-        /// is only replaced when the current feed has a higher priority (lower index).
+        /// Decides whether an episode should be left alone:
+        /// files not grabbed by ANIRSS are never touched, and an ANIRSS-grabbed
+        /// episode is only re-pushed when the current feed has a higher priority
+        /// (lower index). Episodes already grabbed from the same or a worse source
+        /// are skipped whether or not the file has landed yet - re-pushing while the
+        /// download is still in progress makes the download client reject the
+        /// duplicate torrent.
         /// </summary>
         private bool ShouldSkipExistingFile(Episode episode,
                                             int season,
@@ -257,12 +261,22 @@ namespace SonarrPatcher.Patches.AniRss
                                             int rssIndex,
                                             Dictionary<int, EpisodeHistory> latestGrabByEpisodeId)
         {
+            var existingIndex = GetAniRssIndex(latestGrabByEpisodeId, episode.Id);
+
+            if (existingIndex != null && rssIndex >= existingIndex.Value)
+            {
+                // Current source is not better than the one that grabbed the episode,
+                // whether the file has been imported yet or the download is still in
+                // flight (the duplicate would be rejected by the download client).
+                _logger.Info("S{0}E{1} already grabbed from ANIRSS index {2}, current {3} not better, skipping.", season, episodeNumber, existingIndex.Value, rssIndex);
+                return true;
+            }
+
             if (!episode.HasFile)
             {
                 return false;
             }
 
-            var existingIndex = GetAniRssIndex(latestGrabByEpisodeId, episode.Id);
             if (existingIndex == null)
             {
                 // Episode file exists but was not downloaded by ANIRSS; leave it alone.
@@ -270,17 +284,22 @@ namespace SonarrPatcher.Patches.AniRss
                 return true;
             }
 
-            if (rssIndex >= existingIndex.Value)
-            {
-                // Current source is not better than the one that grabbed the file.
-                _logger.Info("S{0}E{1} already grabbed from ANIRSS index {2}, current {3} not better, skipping.", season, episodeNumber, existingIndex.Value, rssIndex);
-                return true;
-            }
-
             // Higher priority source: push again; Sonarr's import/upgrade
             // machinery replaces the old file.
             _logger.Info("S{0}E{1} upgrading from ANIRSS index {2} to {3}.", season, episodeNumber, existingIndex.Value, rssIndex);
             return false;
+        }
+
+        /// <summary>
+        /// Pure decision rule behind <see cref="ShouldSkipExistingFile"/>, unit-testable
+        /// without Sonarr: skip when the episode is already grabbed from the same or a
+        /// worse source (download in progress or file present), or when a file exists
+        /// that ANIRSS did not grab.
+        /// </summary>
+        internal static bool ShouldSkipEpisode(bool episodeHasFile, int? existingAniRssIndex, int rssIndex)
+        {
+            return (existingAniRssIndex != null && rssIndex >= existingAniRssIndex.Value)
+                || (episodeHasFile && existingAniRssIndex == null);
         }
 
         private static int? GetAniRssIndex(Dictionary<int, EpisodeHistory> latestGrabByEpisodeId, int episodeId)

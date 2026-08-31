@@ -105,6 +105,51 @@ namespace SonarrPatcher.Tests
         }
 
         [Fact]
+        public void ShouldSkipEpisode_NotGrabbed_NoFile_Pushes()
+        {
+            Assert.False(AniRssCommandExecutor.ShouldSkipEpisode(episodeHasFile: false, existingAniRssIndex: null, rssIndex: 0));
+        }
+
+        [Fact]
+        public void ShouldSkipEpisode_NotGrabbed_HasFile_Skips()
+        {
+            Assert.True(AniRssCommandExecutor.ShouldSkipEpisode(episodeHasFile: true, existingAniRssIndex: null, rssIndex: 0));
+        }
+
+        [Fact]
+        public void ShouldSkipEpisode_GrabbedSameSource_DownloadInProgress_Skips()
+        {
+            // Regression: re-pushing the same torrent while the download is still in
+            // flight makes qBittorrent reject the duplicate ("Download client failed
+            // to add torrent").
+            Assert.True(AniRssCommandExecutor.ShouldSkipEpisode(episodeHasFile: false, existingAniRssIndex: 1, rssIndex: 1));
+        }
+
+        [Fact]
+        public void ShouldSkipEpisode_GrabbedWorseSource_DownloadInProgress_Skips()
+        {
+            Assert.True(AniRssCommandExecutor.ShouldSkipEpisode(episodeHasFile: false, existingAniRssIndex: 0, rssIndex: 2));
+        }
+
+        [Fact]
+        public void ShouldSkipEpisode_GrabbedBetterSource_DownloadInProgress_Pushes()
+        {
+            Assert.False(AniRssCommandExecutor.ShouldSkipEpisode(episodeHasFile: false, existingAniRssIndex: 2, rssIndex: 0));
+        }
+
+        [Fact]
+        public void ShouldSkipEpisode_GrabbedSameSource_HasFile_Skips()
+        {
+            Assert.True(AniRssCommandExecutor.ShouldSkipEpisode(episodeHasFile: true, existingAniRssIndex: 1, rssIndex: 1));
+        }
+
+        [Fact]
+        public void ShouldSkipEpisode_GrabbedBetterSource_HasFile_Pushes()
+        {
+            Assert.False(AniRssCommandExecutor.ShouldSkipEpisode(episodeHasFile: true, existingAniRssIndex: 1, rssIndex: 0));
+        }
+
+        [Fact]
         public void SubscribeConfig_SerializesFormattedJson_RoundTrips()
         {
             var config = new List<AniRssSubscribeItem>
