@@ -108,7 +108,7 @@ namespace SonarrPatcher.Patches.AniRss
 
             if (!File.Exists(configPath))
             {
-                _logger.Warn("AniRss subscribe file not found: {0}", configPath);
+                _logger.Warn("subscribe file not found: {0}", configPath);
                 return null;
             }
 
@@ -159,7 +159,7 @@ namespace SonarrPatcher.Patches.AniRss
                 _historyService.GetBySeason(series.Id, sub.Season, EpisodeHistoryEventType.Grabbed));
             var epRegex = sub.EpRegex.IsNullOrWhiteSpace() ? " ([0-9]{2,}) " : sub.EpRegex;
 
-            _logger.Info("AniRss: processing {0} S{1} ({2} episodes, {3} rss sources)", series.Title, sub.Season, episodesByNumber.Count, sub.Rss?.Count ?? 0);
+            _logger.Info("processing {0} S{1} ({2} episodes, {3} rss sources)", series.Title, sub.Season, episodesByNumber.Count, sub.Rss?.Count ?? 0);
 
             for (var rssIndex = 0; rssIndex < (sub.Rss?.Count ?? 0); rssIndex++)
             {
@@ -360,7 +360,7 @@ namespace SonarrPatcher.Patches.AniRss
 
                 var json = JsonSerializer.Serialize(config, JsonOptions);
                 File.WriteAllText(configPath, json);
-                _logger.Info("AniRss subscribe config written to {0}", configPath);
+                _logger.Info("subscribe config written to {0}", configPath);
             }
             catch (Exception ex)
             {

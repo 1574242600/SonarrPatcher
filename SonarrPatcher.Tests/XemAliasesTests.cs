@@ -1,10 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Runtime.Serialization;
 using HarmonyLib;
+using Newtonsoft.Json.Linq;
 using SonarrPatcher.Patches.XemAliases;
 using Xunit;
 
@@ -137,6 +139,51 @@ namespace SonarrPatcher.Tests
             }
         }
 
+        [SkippableFact]
+        public void ParseMappings_ParsesJObjectWithFateZeroHack()
+        {
+            EnsureCoreLoaded();
+
+            var parseMappings = typeof(XemAliases).GetMethod("ParseMappings", BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.NotNull(parseMappings);
+
+            // Same shape as the allNames payload deserialized by Sonarr's Json.NET:
+            // tvdbId -> [{ "<title>": "<seasonNumber>" }, ...]
+            var data = new Dictionary<int, List<JObject>>
+            {
+                {
+                    79151,
+                    new List<JObject>
+                    {
+                        new JObject { ["Fate/Zero"] = "1" },
+                        new JObject { ["Fate/Zero Season 2"] = "2" }
+                    }
+                },
+                {
+                    73969,
+                    new List<JObject>
+                    {
+                        new JObject { ["Suits"] = "1" }
+                    }
+                }
+            };
+
+            var result = (System.Collections.IList)parseMappings.Invoke(null, new object[] { data });
+
+            // Fate/Zero season 2 dropped by the hack, season 1 kept; Suits kept.
+            Assert.Equal(2, result.Count);
+
+            var fateZero = result[0];
+            Assert.Equal("Fate/Zero", fateZero.GetType().GetProperty("Title").GetValue(fateZero));
+            Assert.Equal(79151, fateZero.GetType().GetProperty("TvdbId").GetValue(fateZero));
+            Assert.Equal(1, fateZero.GetType().GetProperty("SceneSeasonNumber").GetValue(fateZero));
+
+            var suits = result[1];
+            Assert.Equal("Suits", suits.GetType().GetProperty("Title").GetValue(suits));
+            Assert.Equal(73969, suits.GetType().GetProperty("TvdbId").GetValue(suits));
+            Assert.Equal(1, suits.GetType().GetProperty("SceneSeasonNumber").GetValue(suits));
+        }
+
         private static (Type Type, MethodInfo Method) EnsureIsEnglishAvailable()
         {
             var baseDir = AppContext.BaseDirectory;
@@ -166,6 +213,7 @@ namespace SonarrPatcher.Tests
 
             LoadIfAbsent(commonPath);
             LoadIfAbsent(Path.Combine(baseDir, "0Harmony.dll"));
+            LoadIfAbsent(Path.Combine(baseDir, "Newtonsoft.Json.dll"));
         }
 
         private static void EnsureCoreLoaded()
@@ -178,6 +226,7 @@ namespace SonarrPatcher.Tests
             LoadIfAbsent(Path.Combine(baseDir, "Sonarr.Common.dll"));
             LoadIfAbsent(Path.Combine(baseDir, "NLog.dll"));
             LoadIfAbsent(Path.Combine(baseDir, "0Harmony.dll"));
+            LoadIfAbsent(Path.Combine(baseDir, "Newtonsoft.Json.dll"));
         }
 
         private static void LoadIfAbsent(string path)

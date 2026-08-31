@@ -4,6 +4,7 @@
     <AssemblyName>SonarrPatcher.Patches.XemAliases</AssemblyName>
     <RootNamespace>SonarrPatcher.Patches</RootNamespace>
     <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
+    <SonarrDir Condition="'$(SonarrDir)' == ''">/workspaces/Sonarr/_output/net6.0/linux-x64/publish</SonarrDir>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\Patch.cs" Link="Patches/Patch.cs" />
@@ -11,7 +12,14 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Lib.Harmony" Version="2.3.3" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Reuse the Json.NET already loaded in the Sonarr process (Newtonsoft.Json 13.0.3);
+         not copied to output (Private=false), no NuGet package. -->
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(SonarrDir)\Newtonsoft.Json.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="SonarrPatcher.Tests" />

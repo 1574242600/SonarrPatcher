@@ -148,7 +148,7 @@ namespace SonarrPatcher.Patches.AniRss
             }
             catch (Exception ex)
             {
-                Log.Warn("AniRss: failed to divert download to manual import: " + ex.Message);
+                Log.Warn("failed to divert download to manual import: " + ex.Message);
                 return true;
             }
         }
@@ -173,7 +173,7 @@ namespace SonarrPatcher.Patches.AniRss
                 if (!_servicesWarned)
                 {
                     _servicesWarned = true;
-                    Log.Warn("AniRss manual import inactive: Sonarr services were not captured.");
+                    Log.Warn("manual import inactive: Sonarr services were not captured.");
                 }
 
                 return false;
@@ -197,7 +197,7 @@ namespace SonarrPatcher.Patches.AniRss
             var outputPath = trackedDownload.ImportItem?.OutputPath.FullPath;
             if (outputPath.IsNullOrWhiteSpace())
             {
-                Log.Warn("AniRss: no import path for '" + downloadItem.Title + "', leaving it to Sonarr.");
+                Log.Warn("no import path for '" + downloadItem.Title + "', leaving it to Sonarr.");
                 return false;
             }
 
@@ -212,7 +212,7 @@ namespace SonarrPatcher.Patches.AniRss
 
             if (files.Count == 0)
             {
-                Log.Warn("AniRss: no importable file in '" + outputPath + "', leaving it to Sonarr.");
+                Log.Warn("no importable file in '" + outputPath + "', leaving it to Sonarr.");
                 return false;
             }
 
@@ -221,7 +221,7 @@ namespace SonarrPatcher.Patches.AniRss
             Queued[downloadId] = DateTime.UtcNow;
             PruneQueued();
 
-            Log.Info("AniRss: handed '" + downloadItem.Title + "' to manual import as episode(s) [" +
+            Log.Info("handed '" + downloadItem.Title + "' to manual import as episode(s) [" +
                 string.Join(", ", episodeIds) + "] over " + files.Count + " file(s).");
 
             return true;

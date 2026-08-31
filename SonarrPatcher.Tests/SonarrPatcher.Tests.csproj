@@ -35,6 +35,7 @@
     <None Include="$(SonarrDir)\NLog.Layouts.ClefJsonLayout.dll" Link="NLog.Layouts.ClefJsonLayout.dll" CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(SonarrDir)\DryIoc.dll" Link="DryIoc.dll" CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(SonarrDir)\MonoTorrent.dll" Link="MonoTorrent.dll" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(SonarrDir)\Newtonsoft.Json.dll" Link="Newtonsoft.Json.dll" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup Condition="Exists('$(SonarrDir)\Sonarr.Common.dll') and Exists('$(SonarrDir)\Sonarr.Core.dll')">
     <Reference Include="Sonarr.Common">
@@ -43,6 +44,10 @@
     </Reference>
     <Reference Include="Sonarr.Core">
       <HintPath>$(SonarrDir)\Sonarr.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(SonarrDir)\Newtonsoft.Json.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>

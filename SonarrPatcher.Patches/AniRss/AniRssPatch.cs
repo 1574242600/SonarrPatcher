@@ -40,7 +40,7 @@ namespace SonarrPatcher.Patches.AniRss
         {
             if (_intervalMinutes == 0 || string.IsNullOrWhiteSpace(SubscribeFile))
             {
-                Log.Info("AniRss disabled (ANIRSS_INTERVAL_MINUTES=0 or ANIRSS_SUBSCRIBE_FILE empty)");
+                Log.Info("disabled (ANIRSS_INTERVAL_MINUTES=0 or ANIRSS_SUBSCRIBE_FILE empty)");
                 return false;
             }
 
@@ -163,7 +163,7 @@ namespace SonarrPatcher.Patches.AniRss
 
             repository.Upsert(task);
             cache.Set(task.TypeName, task);
-            Log.Info("AniRss task registered. interval=" + _intervalMinutes + " min");
+            Log.Info("task registered. interval=" + _intervalMinutes + " min");
         }
     }
 }

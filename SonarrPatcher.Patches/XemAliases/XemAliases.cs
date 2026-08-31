@@ -142,6 +142,9 @@ namespace SonarrPatcher.Patches.XemAliases
 
             var xemResultType = ReflectionHelper.RequireType(AccessTools.TypeByName("NzbDrone.Core.DataAugmentation.Xem.Model.XemResult`1"), "XemResult<T>");
 
+            // Same payload type Sonarr's own XemProxy.GetSceneTvdbNames uses: the
+            // allNames response is a dynamic title -> seasonNumber map with no
+            // strongly-typed model, so JObject is the shared representation.
             var generic = xemResultType.MakeGenericType(typeof(Dictionary<int, List<JObject>>));
             var closedGet = getMethod.MakeGenericMethod(generic);
 
