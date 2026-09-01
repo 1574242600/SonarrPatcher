@@ -243,7 +243,7 @@ namespace SonarrPatcher.Tests
             Assert.Equal(1, back[0].Season);
             Assert.Equal(2, back[0].EpOffset);
             Assert.Equal(2, back[0].Rss.Count);
-            Assert.Equal(" ([0-9]{2,}) ", back[0].EpRegex);
+            Assert.Null(back[0].EpRegex);
         }
 
         [Fact]
@@ -261,6 +261,79 @@ namespace SonarrPatcher.Tests
             });
 
             Assert.DoesNotContain("title", json, StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
+        public void SubscribeConfig_DefaultEpOffset_NotWrittenAndDefaultsToZero()
+        {
+            var config = new List<AniRssSubscribeItem>
+            {
+                new AniRssSubscribeItem { TvdbId = 456, Season = 2 }
+            };
+
+            var json = JsonSerializer.Serialize(config, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                WriteIndented = true
+            });
+
+            // Default epOffset (0) must not be written back, keeping the file clean.
+            Assert.DoesNotContain("epOffset", json, StringComparison.OrdinalIgnoreCase);
+
+            // A config without epOffset parses back to 0.
+            var back = JsonSerializer.Deserialize<List<AniRssSubscribeItem>>(
+                "[{\"tvdbId\":456,\"season\":2}]",
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            Assert.Equal(0, back[0].EpOffset);
+        }
+
+        [Fact]
+        public void SubscribeConfig_UnsetEpRegex_NotWrittenAndParsesNull()
+        {
+            var config = new List<AniRssSubscribeItem>
+            {
+                new AniRssSubscribeItem { TvdbId = 456, Season = 2 }
+            };
+
+            var json = JsonSerializer.Serialize(config, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                WriteIndented = true
+            });
+
+            // Unset epRegex must not be written back, keeping the file clean.
+            Assert.DoesNotContain("epRegex", json, StringComparison.OrdinalIgnoreCase);
+
+            // A config without epRegex parses back to null; the caller falls back to
+            // AniRssSubscribeItem.DefaultEpRegex (mirrors how EpOffset defaults to 0).
+            var back = JsonSerializer.Deserialize<List<AniRssSubscribeItem>>(
+                "[{\"tvdbId\":456,\"season\":2}]",
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            Assert.Null(back[0].EpRegex);
+        }
+
+        [Fact]
+        public void SubscribeConfig_CustomEpRegex_RoundTrips()
+        {
+            var config = new List<AniRssSubscribeItem>
+            {
+                new AniRssSubscribeItem { TvdbId = 456, Season = 2, EpRegex = " EP([0-9]+) " }
+            };
+
+            var json = JsonSerializer.Serialize(config, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                WriteIndented = true
+            });
+
+            var back = JsonSerializer.Deserialize<List<AniRssSubscribeItem>>(json, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+            Assert.Equal(" EP([0-9]+) ", back[0].EpRegex);
         }
 
         // ---- Integration tests (require Sonarr.Core.dll) ----

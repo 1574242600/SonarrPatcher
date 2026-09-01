@@ -170,7 +170,7 @@ namespace SonarrPatcher.Patches.AniRss
             var episodesByNumber = IndexEpisodesByNumber(series.Id, sub.Season);
             var latestGrabByEpisodeId = LatestGrabByEpisodeId(
                 _historyService.GetBySeason(series.Id, sub.Season, EpisodeHistoryEventType.Grabbed));
-            var epRegex = sub.EpRegex.IsNullOrWhiteSpace() ? " ([0-9]{2,}) " : sub.EpRegex;
+            var epRegex = sub.EpRegex.IsNullOrWhiteSpace() ? AniRssSubscribeItem.DefaultEpRegex : sub.EpRegex;
 
             _logger.Info("processing {0} S{1} ({2} episodes, {3} rss sources)", series.Title, sub.Season, episodesByNumber.Count, sub.Rss?.Count ?? 0);
 

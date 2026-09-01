@@ -21,10 +21,23 @@ namespace SonarrPatcher.Patches.AniRss
 
         public int Season { get; set; }
 
-        /// <summary>Regex applied to each RSS item title to extract the episode number.</summary>
-        public string EpRegex { get; set; } = " ([0-9]{2,}) ";
+        /// <summary>Default <see cref="EpRegex"/>: a plain episode number surrounded by spaces.</summary>
+        public const string DefaultEpRegex = " ([0-9]{2,}) ";
 
-        /// <summary>Offset added to the parsed episode number (for series starting at a non-1 episode).</summary>
+        /// <summary>
+        /// Optional regex applied to each RSS item title to extract the episode number.
+        /// Unset (null/whitespace) means <see cref="DefaultEpRegex"/>, so callers must
+        /// fall back to <see cref="DefaultEpRegex"/>; omitted from the written file when
+        /// unset. Mirrors <see cref="EpOffset"/>: the type's default marks "not set".
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string EpRegex { get; set; }
+
+        /// <summary>
+        /// Optional offset added to the parsed episode number (for series starting at a
+        /// non-1 episode). Defaults to 0; omitted from the written file when 0.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
         public int EpOffset { get; set; }
 
         /// <summary>RSS feed URLs; lower index = higher priority.</summary>

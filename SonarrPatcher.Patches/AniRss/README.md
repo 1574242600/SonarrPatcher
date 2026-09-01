@@ -81,8 +81,8 @@ which case it is persisted back to `ANIRSS_SUBSCRIBE_FILE` (formatted JSON).
 | `title` | *Optional.* Human-readable label to make the file easier to read/edit; **not used by any business logic**. Omitted from the written file when not set. |
 | `tvdbId` | Series to subscribe, resolved via Sonarr's existing series (TVDB id). |
 | `season` | Season number to watch. |
-| `epRegex` | Regex applied to each RSS item title; the first capture group (or the whole match) is used and its digits are the episode number. Default ` ([0-9]{2,}) `. |
-| `epOffset` | Added to the parsed episode number (for series whose numbering starts at a non-1 episode). |
+| `epRegex` | *Optional.* Regex applied to each RSS item title; the first capture group (or the whole match) is used and its digits are the episode number. Unset means `` ` ([0-9]{2,}) ` ``; omitted from the written file when unset. |
+| `epOffset` | *Optional.* Added to the parsed episode number (for series whose numbering starts at a non-1 episode). Defaults to `0`; omitted from the written file when `0`. |
 | `rss` | Feed URLs, **lower index = higher priority**. Used both for picking the best source and for the `#ANIRSS{index}` upgrade marker. |
 
 ## Usage
