@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace SonarrPatcher.Patches.AniRss
 {
@@ -8,6 +9,14 @@ namespace SonarrPatcher.Patches.AniRss
     /// </summary>
     public class AniRssSubscribeItem
     {
+        /// <summary>
+        /// Optional human-readable name for this subscription. Exists only to make
+        /// the config file easier to read and edit by hand; no business logic reads it.
+        /// Omitted from the written file when not set.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string Title { get; set; }
+
         public int TvdbId { get; set; }
 
         public int Season { get; set; }

@@ -215,6 +215,7 @@ namespace SonarrPatcher.Tests
             {
                 new AniRssSubscribeItem
                 {
+                    Title = "示例番剧",
                     TvdbId = 123,
                     Season = 1,
                     EpOffset = 2,
@@ -237,11 +238,29 @@ namespace SonarrPatcher.Tests
             });
 
             Assert.Single(back);
+            Assert.Equal("示例番剧", back[0].Title);
             Assert.Equal(123, back[0].TvdbId);
             Assert.Equal(1, back[0].Season);
             Assert.Equal(2, back[0].EpOffset);
             Assert.Equal(2, back[0].Rss.Count);
             Assert.Equal(" ([0-9]{2,}) ", back[0].EpRegex);
+        }
+
+        [Fact]
+        public void SubscribeConfig_NullTitle_NotWrittenToJson()
+        {
+            var config = new List<AniRssSubscribeItem>
+            {
+                new AniRssSubscribeItem { TvdbId = 456, Season = 2 }
+            };
+
+            var json = JsonSerializer.Serialize(config, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                WriteIndented = true
+            });
+
+            Assert.DoesNotContain("title", json, StringComparison.OrdinalIgnoreCase);
         }
 
         // ---- Integration tests (require Sonarr.Core.dll) ----
