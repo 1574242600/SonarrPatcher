@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using NzbDrone.Common;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.CustomFormats;
 using NzbDrone.Core.Download;
@@ -13,8 +14,8 @@ namespace SonarrPatcher.Patches.AniRss
     /// <summary>
     /// Builds a <see cref="TorrentInfo"/> + <see cref="RemoteEpisode"/> from an RSS
     /// item and pushes it to the configured download client, appending a
-    /// <c>#ANIRSS{index}</c> marker to the release title so later runs can tell
-    /// whether an episode was downloaded by AniRss and from which RSS source.
+    /// <c>#ANIRSS{index}-{urlCrc32}</c> marker to the release title so later runs can
+    /// tell whether an episode was downloaded by AniRss and from which RSS source.
     /// </summary>
     internal static class DownloadHelper
     {
@@ -23,11 +24,12 @@ namespace SonarrPatcher.Patches.AniRss
                                     Series series,
                                     Episode episode,
                                     int rssIndex,
+                                    string rssUrl,
                                     int downloadClientId)
         {
             var release = new TorrentInfo
             {
-                Title = item.Title + " #ANIRSS" + rssIndex,
+                Title = item.Title + " #ANIRSS" + rssIndex + "-" + HashUtil.CalculateCrc(rssUrl),
                 DownloadUrl = item.DownloadUrl,
                 MagnetUrl = item.MagnetUrl,
                 InfoHash = item.InfoHash,

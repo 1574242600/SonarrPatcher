@@ -28,7 +28,7 @@ namespace SonarrPatcher.Patches.AniRss
     /// </para>
     /// <para>
     /// This patch hooks that entry point as a Harmony prefix. For downloads whose grab
-    /// history carries the AniRss <c>#ANIRSS{index}</c> marker it builds a
+    /// history carries the AniRss <c>#ANIRSS{index}-{urlCrc32}</c> marker it builds a
     /// <see cref="ManualImportCommand"/> with the grabbed episode ids and lets that
     /// command do the importing, then skips Sonarr's automatic import entirely —
     /// <c>ManualImportService</c> applies the requested episodes after aggregation and
@@ -44,9 +44,9 @@ namespace SonarrPatcher.Patches.AniRss
     {
         /// <summary>
         /// Marker AniRss appends to every pushed release title, and that Sonarr persists
-        /// in the grab history's source title.
+        /// in the grab history's source title. Format: <c>#ANIRSS{index}-{urlCrc32}</c>.
         /// </summary>
-        internal static readonly Regex MarkerRegex = new Regex(@"#ANIRSS(\d+)", RegexOptions.Compiled);
+        internal static readonly Regex MarkerRegex = new Regex(@"#ANIRSS(\d+)-([0-9a-f]{8})", RegexOptions.Compiled);
 
         /// <summary>
         /// How long a download id is remembered after queueing its manual import. Sonarr

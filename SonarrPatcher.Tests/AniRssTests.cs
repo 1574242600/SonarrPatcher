@@ -5,8 +5,8 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using HarmonyLib;
+using NzbDrone.Common;
 using NzbDrone.Common.Disk;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.Download;
@@ -61,24 +61,83 @@ namespace SonarrPatcher.Tests
             Assert.Null(AniRssCommandExecutor.ParseEpisodeNumber("No numbers here", " ([0-9]{2,}) "));
         }
 
-        [Fact]
-        public void ParseAniRssIndex_ExtractsIndex()
+        // ---- Grabbed source resolution (require Sonarr.Common for HashUtil.CalculateCrc) ----
+
+        [SkippableFact]
+        public void GetAniRssSourceIndex_RelocatesGrabbedSourceInCurrentList()
         {
-            Assert.Equal(3, AniRssCommandExecutor.ParseAniRssIndex(Regex.Match("Title #ANIRSS3", @"#ANIRSS(\d+)")));
+            // Regression: the subscribe file was reordered, so the marker's recorded
+            // index (0) no longer matches the grabbing feed's position. The source must
+            // be located by URL CRC32 in the current list instead.
+            SkipIfSonarrMissing();
+
+            var bCrc = HashUtil.CalculateCrc("https://feed.example/b");
+            var sub = new AniRssSubscribeItem
+            {
+                Rss = new List<string> { "https://feed.example/a", "https://feed.example/b" }
+            };
+            var history = new Dictionary<int, EpisodeHistory>
+            {
+                { 5, new EpisodeHistory { SourceTitle = "[G] Show 03 #ANIRSS0-" + bCrc } }
+            };
+
+            Assert.Equal(1, AniRssCommandExecutor.GetAniRssSourceIndex(sub, history, 5));
         }
 
-        [Fact]
-        public void ParseAniRssIndex_NoMarker_ReturnsNull()
+        [SkippableFact]
+        public void GetAniRssSourceIndex_SourceRemovedFromList_ReturnsNull()
         {
-            Assert.Null(AniRssCommandExecutor.ParseAniRssIndex(Regex.Match("Plain title", @"#ANIRSS(\d+)")));
+            SkipIfSonarrMissing();
+
+            var bCrc = HashUtil.CalculateCrc("https://feed.example/b");
+            var sub = new AniRssSubscribeItem
+            {
+                Rss = new List<string> { "https://feed.example/a" }
+            };
+            var history = new Dictionary<int, EpisodeHistory>
+            {
+                { 5, new EpisodeHistory { SourceTitle = "[G] Show 03 #ANIRSS0-" + bCrc } }
+            };
+
+            Assert.Null(AniRssCommandExecutor.GetAniRssSourceIndex(sub, history, 5));
+        }
+
+        [SkippableFact]
+        public void GetAniRssSourceIndex_NotAniRssHistory_ReturnsNull()
+        {
+            SkipIfSonarrMissing();
+
+            var sub = new AniRssSubscribeItem
+            {
+                Rss = new List<string> { "https://feed.example/a" }
+            };
+            var history = new Dictionary<int, EpisodeHistory>
+            {
+                { 5, new EpisodeHistory { SourceTitle = "[G] Show 03 1080p" } }
+            };
+
+            Assert.Null(AniRssCommandExecutor.GetAniRssSourceIndex(sub, history, 5));
+        }
+
+        [SkippableFact]
+        public void GetAniRssSourceIndex_NoHistory_ReturnsNull()
+        {
+            SkipIfSonarrMissing();
+
+            var sub = new AniRssSubscribeItem
+            {
+                Rss = new List<string> { "https://feed.example/a" }
+            };
+
+            Assert.Null(AniRssCommandExecutor.GetAniRssSourceIndex(sub, new Dictionary<int, EpisodeHistory>(), 5));
         }
 
         [Fact]
         public void LatestGrabByEpisodeId_PicksNewestEntryPerEpisode()
         {
             var older = new EpisodeHistory { EpisodeId = 5, Date = new DateTime(2026, 1, 1), SourceTitle = "[G] Show 03" };
-            var newer = new EpisodeHistory { EpisodeId = 5, Date = new DateTime(2026, 2, 1), SourceTitle = "[G] Show 03 #ANIRSS1" };
-            var other = new EpisodeHistory { EpisodeId = 6, Date = new DateTime(2026, 3, 1), SourceTitle = "[G] Show 04 #ANIRSS0" };
+            var newer = new EpisodeHistory { EpisodeId = 5, Date = new DateTime(2026, 2, 1), SourceTitle = "[G] Show 03 #ANIRSS1-12345678" };
+            var other = new EpisodeHistory { EpisodeId = 6, Date = new DateTime(2026, 3, 1), SourceTitle = "[G] Show 04 #ANIRSS0-12345678" };
 
             var latest = AniRssCommandExecutor.LatestGrabByEpisodeId(new List<EpisodeHistory> { older, newer, other });
 
@@ -96,8 +155,8 @@ namespace SonarrPatcher.Tests
         [Fact]
         public void LatestGrabByEpisodeId_KeepsFirstEntryOnEqualDates()
         {
-            var first = new EpisodeHistory { EpisodeId = 5, Date = new DateTime(2026, 1, 1), SourceTitle = "[G] Show 03 #ANIRSS1" };
-            var sameDate = new EpisodeHistory { EpisodeId = 5, Date = first.Date, SourceTitle = "[G] Show 03 #ANIRSS2" };
+            var first = new EpisodeHistory { EpisodeId = 5, Date = new DateTime(2026, 1, 1), SourceTitle = "[G] Show 03 #ANIRSS1-12345678" };
+            var sameDate = new EpisodeHistory { EpisodeId = 5, Date = first.Date, SourceTitle = "[G] Show 03 #ANIRSS2-12345678" };
 
             var latest = AniRssCommandExecutor.LatestGrabByEpisodeId(new List<EpisodeHistory> { first, sameDate });
 
@@ -348,7 +407,7 @@ namespace SonarrPatcher.Tests
         [Fact]
         public void IsAniRssTitle_RecognisesMarker()
         {
-            Assert.True(AniRssImportBinder.IsAniRssTitle("[Group] Show 05 [1080p] #ANIRSS1"));
+            Assert.True(AniRssImportBinder.IsAniRssTitle("[Group] Show 05 [1080p] #ANIRSS1-12345678"));
             Assert.False(AniRssImportBinder.IsAniRssTitle("[Group] Show 05 [1080p]"));
             Assert.False(AniRssImportBinder.IsAniRssTitle(null));
         }
@@ -479,7 +538,7 @@ namespace SonarrPatcher.Tests
             SkipIfSonarrMissing();
 
             var history = new FakeHistoryService();
-            history.Grabbed.Add(Grabbed("dl-anirss", 5, "[Group] Show 03 #ANIRSS1"));
+            history.Grabbed.Add(Grabbed("dl-anirss", 5, "[Group] Show 03 #ANIRSS1-12345678"));
             var manual = new FakeManualImportService();
             manual.Items.Add(Item("/d/unparseable.mkv", 100, null));
             var queue = new FakeCommandQueue();
@@ -501,7 +560,7 @@ namespace SonarrPatcher.Tests
             SkipIfSonarrMissing();
 
             var history = new FakeHistoryService();
-            history.Grabbed.Add(Grabbed("dl-once", 5, "[Group] Show 03 #ANIRSS1"));
+            history.Grabbed.Add(Grabbed("dl-once", 5, "[Group] Show 03 #ANIRSS1-12345678"));
             var manual = new FakeManualImportService();
             manual.Items.Add(Item("/d/unparseable.mkv", 100, null));
             var queue = new FakeCommandQueue();
@@ -522,7 +581,7 @@ namespace SonarrPatcher.Tests
             SkipIfSonarrMissing();
 
             var history = new FakeHistoryService();
-            history.Grabbed.Add(Grabbed("dl-nopath", 5, "[Group] Show 03 #ANIRSS1"));
+            history.Grabbed.Add(Grabbed("dl-nopath", 5, "[Group] Show 03 #ANIRSS1-12345678"));
             var queue = new FakeCommandQueue();
             Bind(history, new FakeManualImportService(), queue);
 
