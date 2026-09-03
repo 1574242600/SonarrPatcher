@@ -35,7 +35,16 @@ runs:
         if [ -n "${{ inputs.ref }}" ]; then
           echo "ref=${{ inputs.ref }}" >> "$GITHUB_OUTPUT"
         else
-          tag=$(curl -sS https://api.github.com/repos/Sonarr/Sonarr/releases/latest | jq -r .tag_name)
+          # Authenticate the lookup: unauthenticated calls share the runner IP's
+          # rate limit and intermittently fail with "API rate limit exceeded",
+          # which used to surface as an obscure "Remote branch null not found".
+          response=$(curl -sS -H "Authorization: Bearer ${{ github.token }}" \
+            https://api.github.com/repos/Sonarr/Sonarr/releases/latest)
+          tag=$(printf '%s' "$response" | jq -r .tag_name)
+          if [ "$tag" = "null" ] || [ -z "$tag" ]; then
+            printf 'failed to resolve latest Sonarr release: %s\n' "$response" >&2
+            exit 1
+          fi
           echo "ref=$tag" >> "$GITHUB_OUTPUT"
         fi
 
