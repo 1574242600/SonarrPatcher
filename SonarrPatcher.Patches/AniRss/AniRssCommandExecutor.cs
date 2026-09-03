@@ -172,11 +172,17 @@ namespace SonarrPatcher.Patches.AniRss
                 _historyService.GetBySeason(series.Id, sub.Season, EpisodeHistoryEventType.Grabbed));
             var epRegex = sub.EpRegex.IsNullOrWhiteSpace() ? AniRssSubscribeItem.DefaultEpRegex : sub.EpRegex;
 
+            // The grab snapshot above only knows history that predates this run. Feeds
+            // are walked sequentially, so an episode pushed from rss0 must be remembered
+            // in-process or rss1 would queue it again (the download is still in flight,
+            // HasFile is false, and the snapshot has no record of it yet).
+            var pushedThisRun = new Dictionary<int, int>();
+
             _logger.Info("processing {0} S{1} ({2} episodes, {3} rss sources)", series.Title, sub.Season, episodesByNumber.Count, sub.Rss?.Count ?? 0);
 
             for (var rssIndex = 0; rssIndex < (sub.Rss?.Count ?? 0); rssIndex++)
             {
-                ProcessFeed(sub, series, rssIndex, episodesByNumber, latestGrabByEpisodeId, downloadClientId, epRegex);
+                ProcessFeed(sub, series, rssIndex, episodesByNumber, latestGrabByEpisodeId, pushedThisRun, downloadClientId, epRegex);
             }
         }
 
@@ -212,6 +218,7 @@ namespace SonarrPatcher.Patches.AniRss
                                  int rssIndex,
                                  Dictionary<int, Episode> episodesByNumber,
                                  Dictionary<int, EpisodeHistory> latestGrabByEpisodeId,
+                                 Dictionary<int, int> pushedThisRun,
                                  int downloadClientId,
                                  string epRegex)
         {
@@ -243,7 +250,7 @@ namespace SonarrPatcher.Patches.AniRss
                     continue;
                 }
 
-                if (ShouldSkipExistingFile(episode, sub, url, rssIndex, latestGrabByEpisodeId))
+                if (ShouldSkipExistingFile(episode, sub, rssIndex, latestGrabByEpisodeId, pushedThisRun))
                 {
                     continue;
                 }
@@ -251,6 +258,11 @@ namespace SonarrPatcher.Patches.AniRss
                 try
                 {
                     DownloadHelper.Download(_downloadService, item, series, episode, rssIndex, url, downloadClientId);
+
+                    // Queued successfully - record it for the remaining feeds. Only a
+                    // successful queue counts: when the download client rejects the push,
+                    // a lower-priority feed may still try the episode later.
+                    pushedThisRun[episode.Id] = rssIndex;
                 }
                 catch (Exception ex)
                 {
@@ -273,15 +285,17 @@ namespace SonarrPatcher.Patches.AniRss
         /// be edited and reorder feeds, so a recorded index refers to an old list.
         /// The grabbed source is located in the <em>current</em> list by fingerprint,
         /// and only that position is compared against <paramref name="rssIndex"/>.
+        /// A source that pushed the episode earlier <em>in this run</em> takes
+        /// precedence, because the run-start history snapshot cannot see it.
         /// </para>
         /// </summary>
         private bool ShouldSkipExistingFile(Episode episode,
                                             AniRssSubscribeItem sub,
-                                            string currentUrl,
                                             int rssIndex,
-                                            Dictionary<int, EpisodeHistory> latestGrabByEpisodeId)
+                                            Dictionary<int, EpisodeHistory> latestGrabByEpisodeId,
+                                            Dictionary<int, int> pushedThisRun)
         {
-            var existingIndex = GetAniRssSourceIndex(sub, latestGrabByEpisodeId, episode.Id);
+            var existingIndex = ResolveExistingSourceIndex(pushedThisRun, latestGrabByEpisodeId, sub, episode.Id);
 
             if (existingIndex != null && rssIndex >= existingIndex.Value)
             {
@@ -362,6 +376,26 @@ namespace SonarrPatcher.Patches.AniRss
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// The AniRss source that currently owns an episode. A feed that pushed the
+        /// episode earlier in this run wins over the run-start history snapshot - the
+        /// snapshot cannot see downloads queued after it was taken, so without this
+        /// precedence a later feed would queue the same episode again. Falls back to
+        /// the snapshot when this run has not touched the episode yet.
+        /// </summary>
+        internal static int? ResolveExistingSourceIndex(Dictionary<int, int> pushedThisRun,
+                                                        Dictionary<int, EpisodeHistory> latestGrabByEpisodeId,
+                                                        AniRssSubscribeItem sub,
+                                                        int episodeId)
+        {
+            if (pushedThisRun.TryGetValue(episodeId, out var inRunIndex))
+            {
+                return inRunIndex;
+            }
+
+            return GetAniRssSourceIndex(sub, latestGrabByEpisodeId, episodeId);
         }
 
         private List<TorrentInfo> FetchAndParse(string url)

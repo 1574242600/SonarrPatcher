@@ -132,6 +132,63 @@ namespace SonarrPatcher.Tests
             Assert.Null(AniRssCommandExecutor.GetAniRssSourceIndex(sub, new Dictionary<int, EpisodeHistory>(), 5));
         }
 
+        // Regression: the grab history is snapshotted once before the feed walk, so a
+        // download queued from rss0 is invisible to rss1 through that snapshot. The
+        // in-run push must win, or the same episode gets queued again per feed.
+
+        [SkippableFact]
+        public void ResolveExistingSourceIndex_InRunPush_WinsOverSnapshot()
+        {
+            SkipIfSonarrMissing();
+
+            var bCrc = HashUtil.CalculateCrc("https://feed.example/b");
+            var sub = new AniRssSubscribeItem
+            {
+                Rss = new List<string> { "https://feed.example/a", "https://feed.example/b" }
+            };
+            var snapshot = new Dictionary<int, EpisodeHistory>
+            {
+                { 5, new EpisodeHistory { SourceTitle = "[G] Show 03 #ANIRSS0-" + bCrc } }
+            };
+
+            // This run already pushed episode 5 from feed index 0 (rss a), while the
+            // pre-run snapshot still points at index 1. The in-run push must win.
+            var pushedThisRun = new Dictionary<int, int> { { 5, 0 } };
+
+            Assert.Equal(0, AniRssCommandExecutor.ResolveExistingSourceIndex(pushedThisRun, snapshot, sub, 5));
+        }
+
+        [SkippableFact]
+        public void ResolveExistingSourceIndex_NoInRunPush_FallsBackToSnapshot()
+        {
+            SkipIfSonarrMissing();
+
+            var bCrc = HashUtil.CalculateCrc("https://feed.example/b");
+            var sub = new AniRssSubscribeItem
+            {
+                Rss = new List<string> { "https://feed.example/a", "https://feed.example/b" }
+            };
+            var snapshot = new Dictionary<int, EpisodeHistory>
+            {
+                { 5, new EpisodeHistory { SourceTitle = "[G] Show 03 #ANIRSS0-" + bCrc } }
+            };
+
+            Assert.Equal(1, AniRssCommandExecutor.ResolveExistingSourceIndex(new Dictionary<int, int>(), snapshot, sub, 5));
+        }
+
+        [SkippableFact]
+        public void ResolveExistingSourceIndex_NoGrabAtAll_ReturnsNull()
+        {
+            SkipIfSonarrMissing();
+
+            var sub = new AniRssSubscribeItem
+            {
+                Rss = new List<string> { "https://feed.example/a" }
+            };
+
+            Assert.Null(AniRssCommandExecutor.ResolveExistingSourceIndex(new Dictionary<int, int>(), new Dictionary<int, EpisodeHistory>(), sub, 5));
+        }
+
         [Fact]
         public void LatestGrabByEpisodeId_PicksNewestEntryPerEpisode()
         {
