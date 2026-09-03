@@ -22,7 +22,7 @@ namespace SonarrPatcher.Patches.AniRss
         public int Season { get; set; }
 
         /// <summary>Default <see cref="EpRegex"/>: a plain episode number surrounded by spaces.</summary>
-        public const string DefaultEpRegex = " ([0-9]{2,}) ";
+        public const string DefaultEpRegex = @" (\d{2,}) ";
 
         /// <summary>
         /// Optional regex applied to each RSS item title to extract the episode number.

@@ -32,14 +32,14 @@ namespace SonarrPatcher.Tests
         [Fact]
         public void DefaultEpRegex_ExtractsEpisodeNumber()
         {
-            Assert.Equal(2, AniRssCommandExecutor.ParseEpisodeNumber("[Sub] Some Title 02 [720p]", " ([0-9]{2,}) "));
+            Assert.Equal(2, AniRssCommandExecutor.ParseEpisodeNumber("[Sub] Some Title 02 [720p]", AniRssSubscribeItem.DefaultEpRegex));
         }
 
         [Fact]
         public void DefaultEpRegex_IgnoresResolution()
         {
             // 1080 is not space-delimited as an independent token, so it must not match.
-            Assert.Equal(5, AniRssCommandExecutor.ParseEpisodeNumber("Title 05 [1080p]", " ([0-9]{2,}) "));
+            Assert.Equal(5, AniRssCommandExecutor.ParseEpisodeNumber("Title 05 [1080p]", AniRssSubscribeItem.DefaultEpRegex));
         }
 
         [Fact]
@@ -58,7 +58,7 @@ namespace SonarrPatcher.Tests
         [Fact]
         public void ParseEpisodeNumber_NoMatch_ReturnsNull()
         {
-            Assert.Null(AniRssCommandExecutor.ParseEpisodeNumber("No numbers here", " ([0-9]{2,}) "));
+            Assert.Null(AniRssCommandExecutor.ParseEpisodeNumber("No numbers here", AniRssSubscribeItem.DefaultEpRegex));
         }
 
         // ---- Grabbed source resolution (require Sonarr.Common for HashUtil.CalculateCrc) ----
