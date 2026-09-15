@@ -33,7 +33,9 @@ nothing internal is re-implemented.
      (`pushed/upgraded/skipped/unparsed/unmapped`), plus one line per push, upgrade or
      failure. The per-item detail (every skip, every unparsed title, every unmapped
      episode) is `Debug`, so it stays hidden at Sonarr's default log level: a feed is
-     re-listed in full on every pass, and per-item lines would drown the summary.
+     re-listed in full on every pass, and per-item lines would drown the summary. Only
+     misconfigurations warn — a feed whose regex matched nothing, and a subscription whose
+     `rss` is empty (it is skipped).
 3. **Import binding** (`AniRssImportBinder`) — when a download completes, Sonarr normally
    re-parses the file/folder names to decide which episode it belongs to and rejects
    anything it can't map. For downloads carrying the `#ANIRSS{index}-{urlCrc32}` marker,

@@ -32,7 +32,9 @@ namespace SonarrPatcher.Patches.AniRss
     /// upgrade or failure. The per-item detail (each unparsed title, each unmapped
     /// episode, each skip) is logged at Debug, which Sonarr filters out at its
     /// default log level - a feed is re-listed in full on every run, so per-item
-    /// Info/Warn lines would drown the few lines that carry information.
+    /// Info/Warn lines would drown the few lines that carry information. Only
+    /// misconfigurations warn, because the counts cannot show them: a feed whose
+    /// regex matched nothing, and a subscription with no feeds at all.
     /// </para>
     /// </summary>
     public class AniRssCommandExecutor : IExecute<AniRssCommand>
@@ -173,6 +175,16 @@ namespace SonarrPatcher.Patches.AniRss
                 return;
             }
 
+            // A subscription with no feeds has nothing to walk. Warn before spending the
+            // lookups below: a pass that ran anyway would report all zeros, and that line
+            // is indistinguishable from "every episode is already in place".
+            var feedCount = sub.Rss?.Count ?? 0;
+            if (feedCount == 0)
+            {
+                _logger.Warn("{0} S{1}: no rss sources configured, skipping.", series.Title, sub.Season);
+                return;
+            }
+
             // Lookups used by every item of every feed are built once per subscription
             // instead of being rescanned inside the item loop.
             var episodesByNumber = IndexEpisodesByNumber(series.Id, sub.Season);
@@ -187,9 +199,9 @@ namespace SonarrPatcher.Patches.AniRss
             // walk only has to be told which feed it is on.
             var run = new SubscriptionRun(sub, series, downloadClientId, episodesByNumber, latestGrabByEpisodeId);
 
-            _logger.Debug("processing {0} S{1} ({2} episodes, {3} rss sources)", series.Title, sub.Season, episodesByNumber.Count, sub.Rss?.Count ?? 0);
+            _logger.Debug("processing {0} S{1} ({2} episodes, {3} rss sources)", series.Title, sub.Season, episodesByNumber.Count, feedCount);
 
-            for (var rssIndex = 0; rssIndex < (sub.Rss?.Count ?? 0); rssIndex++)
+            for (var rssIndex = 0; rssIndex < feedCount; rssIndex++)
             {
                 ProcessFeed(run, rssIndex);
             }
