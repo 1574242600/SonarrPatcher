@@ -157,7 +157,9 @@ namespace SonarrPatcher.Patches.AniRss
 
             repository.Upsert(task);
             cache.Set(task.TypeName, task);
-            Log.Info("task registered. interval=" + _intervalMinutes + " min");
+
+            // Detail only: the interval is already reported by "Patch applied".
+            Log.Debug("task registered. interval=" + _intervalMinutes + " min");
         }
     }
 }

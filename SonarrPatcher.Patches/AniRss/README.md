@@ -28,6 +28,11 @@ nothing internal is re-implemented.
      on record for it yet,
    - queues the release with `DownloadService.DownloadReport`, appending
      `#ANIRSS{index}-{urlCrc32}` to the title, which is persisted into the grab history.
+   - **Logging** — one summary line per subscription per pass
+     (`pushed/upgraded/skipped/unparsed/unmapped`), plus one line per push, upgrade or
+     failure. The per-item detail (every skip, every unparsed title, every unmapped
+     episode) is `Debug`, so it stays hidden at Sonarr's default log level: a feed is
+     re-listed in full on every pass, and per-item lines would drown the summary.
 3. **Import binding** (`AniRssImportBinder`) — when a download completes, Sonarr normally
    re-parses the file/folder names to decide which episode it belongs to and rejects
    anything it can't map. For downloads carrying the `#ANIRSS{index}-{urlCrc32}` marker,
