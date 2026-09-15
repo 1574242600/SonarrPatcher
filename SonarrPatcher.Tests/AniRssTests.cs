@@ -220,49 +220,64 @@ namespace SonarrPatcher.Tests
             Assert.Same(first, latest[5]);
         }
 
+        // ---- Skip rule: an episode is only pushed when nothing is on record for it ----
+
         [Fact]
-        public void ShouldSkipEpisode_NotGrabbed_NoFile_Pushes()
+        public void ShouldSkipEpisodeCore_NotGrabbed_NoFile_Pushes()
         {
-            Assert.False(AniRssCommandExecutor.ShouldSkipEpisode(episodeHasFile: false, existingAniRssIndex: null, rssIndex: 0));
+            Assert.False(AniRssCommandExecutor.ShouldSkipEpisodeCore(episodeHasFile: false, episodeHasGrabHistory: false, existingAniRssIndex: null, rssIndex: 0));
         }
 
         [Fact]
-        public void ShouldSkipEpisode_NotGrabbed_HasFile_Skips()
+        public void ShouldSkipEpisodeCore_GrabbedWithoutAniRssSource_NoFile_Skips()
         {
-            Assert.True(AniRssCommandExecutor.ShouldSkipEpisode(episodeHasFile: true, existingAniRssIndex: null, rssIndex: 0));
+            // A grab on record without a file means the download is queued, failed or
+            // was deleted; pushing again makes the download client reject a duplicate.
+            // Covers both an episode Sonarr itself grabbed (no ANIRSS marker) and an
+            // ANIRSS grab whose feed was removed from the subscription, which leaves
+            // no index to resolve.
+            Assert.True(AniRssCommandExecutor.ShouldSkipEpisodeCore(episodeHasFile: false, episodeHasGrabHistory: true, existingAniRssIndex: null, rssIndex: 0));
         }
 
         [Fact]
-        public void ShouldSkipEpisode_GrabbedSameSource_DownloadInProgress_Skips()
+        public void ShouldSkipEpisodeCore_NotGrabbed_HasFile_Skips()
+        {
+            Assert.True(AniRssCommandExecutor.ShouldSkipEpisodeCore(episodeHasFile: true, episodeHasGrabHistory: false, existingAniRssIndex: null, rssIndex: 0));
+        }
+
+        [Fact]
+        public void ShouldSkipEpisodeCore_GrabbedSameSource_DownloadInProgress_Skips()
         {
             // Regression: re-pushing the same torrent while the download is still in
             // flight makes qBittorrent reject the duplicate ("Download client failed
             // to add torrent").
-            Assert.True(AniRssCommandExecutor.ShouldSkipEpisode(episodeHasFile: false, existingAniRssIndex: 1, rssIndex: 1));
+            Assert.True(AniRssCommandExecutor.ShouldSkipEpisodeCore(episodeHasFile: false, episodeHasGrabHistory: true, existingAniRssIndex: 1, rssIndex: 1));
         }
 
         [Fact]
-        public void ShouldSkipEpisode_GrabbedWorseSource_DownloadInProgress_Skips()
+        public void ShouldSkipEpisodeCore_GrabbedWorseSource_DownloadInProgress_Skips()
         {
-            Assert.True(AniRssCommandExecutor.ShouldSkipEpisode(episodeHasFile: false, existingAniRssIndex: 0, rssIndex: 2));
+            Assert.True(AniRssCommandExecutor.ShouldSkipEpisodeCore(episodeHasFile: false, episodeHasGrabHistory: true, existingAniRssIndex: 0, rssIndex: 2));
         }
 
         [Fact]
-        public void ShouldSkipEpisode_GrabbedBetterSource_DownloadInProgress_Pushes()
+        public void ShouldSkipEpisodeCore_GrabbedBetterSource_DownloadInProgress_Skips()
         {
-            Assert.False(AniRssCommandExecutor.ShouldSkipEpisode(episodeHasFile: false, existingAniRssIndex: 2, rssIndex: 0));
+            // A higher priority source no longer pushes while the first download is
+            // unfinished - the upgrade happens once the episode is on disk.
+            Assert.True(AniRssCommandExecutor.ShouldSkipEpisodeCore(episodeHasFile: false, episodeHasGrabHistory: true, existingAniRssIndex: 2, rssIndex: 0));
         }
 
         [Fact]
-        public void ShouldSkipEpisode_GrabbedSameSource_HasFile_Skips()
+        public void ShouldSkipEpisodeCore_GrabbedSameSource_HasFile_Skips()
         {
-            Assert.True(AniRssCommandExecutor.ShouldSkipEpisode(episodeHasFile: true, existingAniRssIndex: 1, rssIndex: 1));
+            Assert.True(AniRssCommandExecutor.ShouldSkipEpisodeCore(episodeHasFile: true, episodeHasGrabHistory: true, existingAniRssIndex: 1, rssIndex: 1));
         }
 
         [Fact]
-        public void ShouldSkipEpisode_GrabbedBetterSource_HasFile_Pushes()
+        public void ShouldSkipEpisodeCore_GrabbedBetterSource_HasFile_Pushes()
         {
-            Assert.False(AniRssCommandExecutor.ShouldSkipEpisode(episodeHasFile: true, existingAniRssIndex: 1, rssIndex: 0));
+            Assert.False(AniRssCommandExecutor.ShouldSkipEpisodeCore(episodeHasFile: true, episodeHasGrabHistory: true, existingAniRssIndex: 1, rssIndex: 0));
         }
 
         [Fact]

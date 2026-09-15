@@ -7,9 +7,12 @@ episode-number regex, pushes matching releases to a download client, and **force
 import to use the episode it grabbed** — no matter how unparseable the downloaded file
 names are.
 
-Two Harmony patches do the wiring (registering the `AniRssCommand` task into Sonarr's
-scheduled-task repository/cache + service capture), and the import step uses Sonarr's own
-`ManualImportCommand` — nothing internal is re-implemented.
+Three Harmony hooks do the wiring: `AssemblyLoader.Load` (this assembly is added to the
+list Sonarr scans, so `AniRssCommand` and its executor are wired up by the DI container),
+`TaskManager.Handle(ApplicationStartedEvent)` (registering the task into Sonarr's
+scheduled-task repository/cache) and `CompletedDownloadService.Import` (routing AniRss
+downloads to the manual import). The import step uses Sonarr's own `ManualImportCommand` —
+nothing internal is re-implemented.
 
 ## What it does
 
@@ -21,16 +24,15 @@ scheduled-task repository/cache + service capture), and the import step uses Son
    - resolves the download client (optionally by name),
    - fetches each RSS feed (host-level 500 ms rate limit), extracts the episode number
      from each item title with `epRegex`, adds `epOffset`, and looks up the Sonarr episode,
-   - skips episodes that already have a file, unless the file came from a lower-priority
-     AniRss source (releases are tagged `#ANIRSS{index}`, where `{index}` is the feed
-     priority) — in that case it pushes again so Sonarr upgrades the file,
-   - queues the release with `DownloadService.DownloadReport`, appending `#ANIRSS{index}`
-     to the title, which is persisted into the grab history.
+   - applies the [skip policy](#skip-policy) — an episode is only pushed when nothing is
+     on record for it yet,
+   - queues the release with `DownloadService.DownloadReport`, appending
+     `#ANIRSS{index}-{urlCrc32}` to the title, which is persisted into the grab history.
 3. **Import binding** (`AniRssImportBinder`) — when a download completes, Sonarr normally
    re-parses the file/folder names to decide which episode it belongs to and rejects
-   anything it can't map. For downloads carrying the `#ANIRSS` marker, the patch
-   intercepts `CompletedDownloadService.Import` and hands the download to Sonarr's
-   official `ManualImportCommand` with the episodes from the grab history:
+   anything it can't map. For downloads carrying the `#ANIRSS{index}-{urlCrc32}` marker,
+   the patch intercepts `CompletedDownloadService.Import` and hands the download to
+   Sonarr's official `ManualImportCommand` with the episodes from the grab history:
    - **Single file** → always bound to the grabbed episode(s).
    - **Several files** → files Sonarr can already map keep their mapping; only the largest
      unmapped file is bound to the grabbed episode, so a batch can never collapse onto one
@@ -40,7 +42,21 @@ scheduled-task repository/cache + service capture), and the import step uses Son
    - Since it goes through `ManualImportService`, the download is completed like a normal
      import: history entry, `EpisodeImportedEvent`, upgrade notifications, and the
      download is removed from the queue. Because manual import bypasses the upgrade
-     specification, re-pushing a better source always replaces the old file.
+     specification, re-pushing a better source replaces the old file when it is imported.
+
+## Skip policy
+
+An episode is pushed **only when nothing is on record for it yet**. The feed walk only
+resolves the inputs; the decision itself lives in one place
+(`AniRssCommandExecutor.ShouldSkipEpisodeCore`) and is applied in this order:
+
+1. The episode is already owned by the same feed, or by a **higher-priority** one (lower
+   index) → **skip**. A worse source adds nothing, and the duplicate would be rejected by
+   the download client. The file state is irrelevant here.
+2. No episode file → **skip when any grab is on record, push otherwise**.
+3. Episode file present, not grabbed by AniRss → **skip**, never touched.
+4. Episode file present, grabbed by a lower-priority feed → **push**: the current,
+   higher-priority feed replaces the file through Sonarr's import.
 
 ## Environment variables
 
@@ -83,7 +99,7 @@ which case it is persisted back to `ANIRSS_SUBSCRIBE_FILE` (formatted JSON).
 | `season` | Season number to watch. |
 | `epRegex` | *Optional.* Regex applied to each RSS item title; the first capture group (or the whole match) is used and its digits are the episode number. Unset means `` ` (\d{2,}) ` ``; omitted from the written file when unset. |
 | `epOffset` | *Optional.* Added to the parsed episode number (for series whose numbering starts at a non-1 episode). Defaults to `0`; omitted from the written file when `0`. |
-| `rss` | Feed URLs, **lower index = higher priority**. Used both for picking the best source and for the `#ANIRSS{index}` upgrade marker. |
+| `rss` | Feed URLs, **lower index = higher priority**. Used for picking the best source. |
 
 ## Usage
 
@@ -113,8 +129,9 @@ services:
 ## Tests
 
 Unit tests cover the episode-number regex parsing, the `#ANIRSS` marker handling, the
-subscribe config round-trip, and the import file-selection policy (single-file binding,
-multi-file handling, sample rejection). Integration tests drive the real
+subscribe config round-trip, the skip policy (grab history with and without a file, source
+resolution, in-flight and upgrade cases) and the import file-selection policy (single-file
+binding, multi-file handling, sample rejection). Integration tests drive the real
 `CompletedDownloadService.Import` interception with stubbed Sonarr services and verify the
 patch targets exist in the running Sonarr build; they need a Sonarr publish dir containing
 `Sonarr.Core.dll`, `Sonarr.Common.dll`, `NLog.dll` and `0Harmony.dll` (default
