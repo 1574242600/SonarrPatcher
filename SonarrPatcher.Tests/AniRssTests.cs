@@ -49,10 +49,64 @@ namespace SonarrPatcher.Tests
         }
 
         [Fact]
-        public void EpOffset_AddsToParsedNumber()
+        public void EpOffsetFor_UsesEntryOfThatFeed()
         {
-            var sub = new AniRssSubscribeItem { EpOffset = 10 };
-            Assert.Equal(10, sub.EpOffset);
+            var sub = new AniRssSubscribeItem { EpOffset = new List<int> { 0, 12 } };
+            Assert.Equal(0, sub.EpOffsetFor(0));
+            Assert.Equal(12, sub.EpOffsetFor(1));
+        }
+
+        [Fact]
+        public void EpOffsetFor_FeedWithoutEntry_FallsBackToDefaultEntry()
+        {
+            // The array is shorter than the feed list: the tail reads index 0.
+            var sub = new AniRssSubscribeItem { EpOffset = new List<int> { 5, 12 } };
+            Assert.Equal(5, sub.EpOffsetFor(2));
+        }
+
+        [Fact]
+        public void EpOffsetFor_Unset_IsZero()
+        {
+            Assert.Equal(0, new AniRssSubscribeItem().EpOffsetFor(0));
+            Assert.Equal(0, new AniRssSubscribeItem { EpOffset = new List<int>() }.EpOffsetFor(3));
+        }
+
+        [Fact]
+        public void EpRegexFor_UsesEntryOfThatFeed()
+        {
+            var sub = new AniRssSubscribeItem { EpRegex = new List<string> { @" (\d{2,}) ", @"第(\d+)话" } };
+            Assert.Equal(@" (\d{2,}) ", sub.EpRegexFor(0));
+            Assert.Equal(@"第(\d+)话", sub.EpRegexFor(1));
+        }
+
+        [Fact]
+        public void EpRegexFor_BlankOrMissingEntry_FallsBackToDefaultEntry()
+        {
+            var sub = new AniRssSubscribeItem { EpRegex = new List<string> { @"第(\d+)话", "  " } };
+            Assert.Equal(@"第(\d+)话", sub.EpRegexFor(1));  // blank entry
+            Assert.Equal(@"第(\d+)话", sub.EpRegexFor(9));  // beyond the array
+        }
+
+        [Fact]
+        public void EpRegexFor_NothingConfigured_UsesDefaultEpRegex()
+        {
+            Assert.Equal(AniRssSubscribeItem.DefaultEpRegex, new AniRssSubscribeItem().EpRegexFor(0));
+            Assert.Equal(AniRssSubscribeItem.DefaultEpRegex, new AniRssSubscribeItem { EpRegex = new List<string>() }.EpRegexFor(2));
+            Assert.Equal(AniRssSubscribeItem.DefaultEpRegex, new AniRssSubscribeItem { EpRegex = new List<string> { " ", null } }.EpRegexFor(1));
+        }
+
+        [Fact]
+        public void PerFeedConfig_FeedWithoutEntry_ParsesWithTheDefaultEntry()
+        {
+            // Feed 2 has no entry of its own, so it uses feed 0's regex and offset.
+            var sub = new AniRssSubscribeItem
+            {
+                EpRegex = new List<string> { @" (\d{2,}) " },
+                EpOffset = new List<int> { 10 }
+            };
+
+            var parsed = AniRssCommandExecutor.ParseEpisodeNumber("[Sub] Show 02 [1080p]", sub.EpRegexFor(2));
+            Assert.Equal(12, parsed + sub.EpOffsetFor(2));
         }
 
         [Fact]
@@ -290,7 +344,7 @@ namespace SonarrPatcher.Tests
                     Title = "示例番剧",
                     TvdbId = 123,
                     Season = 1,
-                    EpOffset = 2,
+                    EpOffset = new List<int> { 2 },
                     Rss = new List<string> { "https://feed.example/1", "https://feed.example/2" }
                 }
             };
@@ -313,7 +367,7 @@ namespace SonarrPatcher.Tests
             Assert.Equal("示例番剧", back[0].Title);
             Assert.Equal(123, back[0].TvdbId);
             Assert.Equal(1, back[0].Season);
-            Assert.Equal(2, back[0].EpOffset);
+            Assert.Equal(new List<int> { 2 }, back[0].EpOffset);
             Assert.Equal(2, back[0].Rss.Count);
             Assert.Null(back[0].EpRegex);
         }
@@ -336,7 +390,7 @@ namespace SonarrPatcher.Tests
         }
 
         [Fact]
-        public void SubscribeConfig_DefaultEpOffset_NotWrittenAndDefaultsToZero()
+        public void SubscribeConfig_UnsetEpOffset_NotWrittenAndParsesNull()
         {
             var config = new List<AniRssSubscribeItem>
             {
@@ -349,15 +403,17 @@ namespace SonarrPatcher.Tests
                 WriteIndented = true
             });
 
-            // Default epOffset (0) must not be written back, keeping the file clean.
+            // Unset epOffset must not be written back, keeping the file clean.
             Assert.DoesNotContain("epOffset", json, StringComparison.OrdinalIgnoreCase);
 
-            // A config without epOffset parses back to 0.
+            // A config without epOffset parses back to null; callers read 0 off it
+            // through EpOffsetFor (mirrors how a missing epRegex means DefaultEpRegex).
             var back = JsonSerializer.Deserialize<List<AniRssSubscribeItem>>(
                 "[{\"tvdbId\":456,\"season\":2}]",
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
-            Assert.Equal(0, back[0].EpOffset);
+            Assert.Null(back[0].EpOffset);
+            Assert.Equal(0, back[0].EpOffsetFor(0));
         }
 
         [Fact]
@@ -377,13 +433,14 @@ namespace SonarrPatcher.Tests
             // Unset epRegex must not be written back, keeping the file clean.
             Assert.DoesNotContain("epRegex", json, StringComparison.OrdinalIgnoreCase);
 
-            // A config without epRegex parses back to null; the caller falls back to
-            // AniRssSubscribeItem.DefaultEpRegex (mirrors how EpOffset defaults to 0).
+            // A config without epRegex parses back to null; callers read DefaultEpRegex
+            // off it through EpRegexFor (mirrors how a missing epOffset means 0).
             var back = JsonSerializer.Deserialize<List<AniRssSubscribeItem>>(
                 "[{\"tvdbId\":456,\"season\":2}]",
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
             Assert.Null(back[0].EpRegex);
+            Assert.Equal(AniRssSubscribeItem.DefaultEpRegex, back[0].EpRegexFor(0));
         }
 
         [Fact]
@@ -391,7 +448,7 @@ namespace SonarrPatcher.Tests
         {
             var config = new List<AniRssSubscribeItem>
             {
-                new AniRssSubscribeItem { TvdbId = 456, Season = 2, EpRegex = " EP([0-9]+) " }
+                new AniRssSubscribeItem { TvdbId = 456, Season = 2, EpRegex = new List<string> { " EP([0-9]+) " } }
             };
 
             var json = JsonSerializer.Serialize(config, new JsonSerializerOptions
@@ -405,7 +462,38 @@ namespace SonarrPatcher.Tests
                 PropertyNameCaseInsensitive = true
             });
 
-            Assert.Equal(" EP([0-9]+) ", back[0].EpRegex);
+            Assert.Equal(new List<string> { " EP([0-9]+) " }, back[0].EpRegex);
+        }
+
+        [Fact]
+        public void SubscribeConfig_PerFeedArrays_ResolveByRssIndex()
+        {
+            // Hand-written file: two regexes and one offset for three feeds. Entry i
+            // belongs to feed i; the feed neither array covers reads index 0.
+            var back = JsonSerializer.Deserialize<List<AniRssSubscribeItem>>(
+                "[{\"tvdbId\":456,\"season\":2,\"epRegex\":[\" a \",\" b \"],\"epOffset\":[1]," +
+                "\"rss\":[\"https://feed.example/0\",\"https://feed.example/1\",\"https://feed.example/2\"]}]",
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            Assert.Equal(3, back[0].Rss.Count);
+            Assert.Equal(" a ", back[0].EpRegexFor(0));
+            Assert.Equal(" b ", back[0].EpRegexFor(1));
+            Assert.Equal(" a ", back[0].EpRegexFor(2));
+            Assert.Equal(1, back[0].EpOffsetFor(2));
+        }
+
+        [Fact]
+        public void SubscribeConfig_LegacyScalarFields_AreRejected()
+        {
+            // No back-compat with the old scalar form: a stale file fails loudly on
+            // read instead of being silently ignored.
+            Assert.ThrowsAny<JsonException>(() => JsonSerializer.Deserialize<List<AniRssSubscribeItem>>(
+                "[{\"tvdbId\":456,\"season\":2,\"epRegex\":\" ([0-9]{2,}) \"}]",
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }));
+
+            Assert.ThrowsAny<JsonException>(() => JsonSerializer.Deserialize<List<AniRssSubscribeItem>>(
+                "[{\"tvdbId\":456,\"season\":2,\"epOffset\":0}]",
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }));
         }
 
         // ---- Integration tests (require Sonarr.Core.dll) ----

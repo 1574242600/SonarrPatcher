@@ -244,6 +244,10 @@ namespace SonarrPatcher.Patches.AniRss
         {
             var sub = run.Subscribe;
             var url = sub.Rss[rssIndex];
+            // Both are per-feed: entry i belongs to feed i, with entry 0 as the
+            // default for feeds the arrays do not reach.
+            var epRegex = sub.EpRegexFor(rssIndex);
+            var epOffset = sub.EpOffsetFor(rssIndex);
             List<TorrentInfo> items;
             try
             {
@@ -259,7 +263,7 @@ namespace SonarrPatcher.Patches.AniRss
 
             foreach (var item in items)
             {
-                var epNumber = ParseEpisodeNumber(item.Title, run.EpRegex);
+                var epNumber = ParseEpisodeNumber(item.Title, epRegex);
                 if (epNumber == null)
                 {
                     run.Stats.Unparsed++;
@@ -269,7 +273,7 @@ namespace SonarrPatcher.Patches.AniRss
 
                 parsedItems++;
 
-                var targetEp = epNumber.Value + sub.EpOffset;
+                var targetEp = epNumber.Value + epOffset;
                 if (!run.EpisodesByNumber.TryGetValue(targetEp, out var episode))
                 {
                     run.Stats.Unmapped++;
@@ -304,7 +308,7 @@ namespace SonarrPatcher.Patches.AniRss
             // of every feed) and it points straight at the misconfiguration.
             if (items.Count > 0 && parsedItems == 0)
             {
-                _logger.Warn("epRegex matched no item in rss{0} ({1} items), check the pattern '{2}'", rssIndex, items.Count, run.EpRegex);
+                _logger.Warn("epRegex matched no item in rss{0} ({1} items), check the pattern '{2}'", rssIndex, items.Count, epRegex);
             }
         }
 
@@ -517,11 +521,11 @@ namespace SonarrPatcher.Patches.AniRss
 
         /// <summary>
         /// State of a single subscription pass, shared by every feed of that
-        /// subscription: the inputs the walk needs (subscription, series, download
-        /// client, effective regex), the lookups built once per pass, the episodes
-        /// pushed so far, and the counters the summary line reports. It exists so
-        /// the feed walk is told which feed to process instead of being handed the
-        /// same eight values at every level.
+        /// subscription: the subscription, the series, the download client, the lookups
+        /// built once per pass, the episodes pushed so far, and the counters the
+        /// summary line reports. It exists so the feed walk is told which feed to
+        /// process instead of being handed the same eight values at every level - the
+        /// per-feed regex and offset are read off the subscription with the feed index.
         /// </summary>
         private sealed class SubscriptionRun
         {
@@ -536,7 +540,6 @@ namespace SonarrPatcher.Patches.AniRss
                 DownloadClientId = downloadClientId;
                 EpisodesByNumber = episodesByNumber;
                 LatestGrabByEpisodeId = latestGrabByEpisodeId;
-                EpRegex = subscribe.EpRegex.IsNullOrWhiteSpace() ? AniRssSubscribeItem.DefaultEpRegex : subscribe.EpRegex;
             }
 
             /// <summary>Subscription being processed; its <c>Rss</c> list drives the walk.</summary>
@@ -547,9 +550,6 @@ namespace SonarrPatcher.Patches.AniRss
 
             /// <summary>Client the releases are queued to.</summary>
             public int DownloadClientId { get; }
-
-            /// <summary>Episode-number regex actually in use (configured, or the default).</summary>
-            public string EpRegex { get; }
 
             /// <summary>Episodes of the watched season by episode number.</summary>
             public Dictionary<int, Episode> EpisodesByNumber { get; }

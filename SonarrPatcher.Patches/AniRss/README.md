@@ -23,7 +23,8 @@ nothing internal is re-implemented.
    - loads the subscribe config (file or command payload),
    - resolves the download client (optionally by name),
    - fetches each RSS feed (host-level 500 ms rate limit), extracts the episode number
-     from each item title with `epRegex`, adds `epOffset`, and looks up the Sonarr episode,
+     from each item title with that feed's `epRegex` entry (falling back to entry 0),
+     adds the matching `epOffset` entry, and looks up the Sonarr episode,
    - applies the [skip policy](#skip-policy) — an episode is only pushed when nothing is
      on record for it yet,
    - queues the release with `DownloadService.DownloadReport`, appending
@@ -87,8 +88,8 @@ which case it is persisted back to `ANIRSS_SUBSCRIBE_FILE` (formatted JSON).
     "title": "我的订阅示例",
     "tvdbId": 100,
     "season": 1,
-    "epRegex": " (\\d{2,}) ",
-    "epOffset": 0,
+    "epRegex": [" (\\d{2,}) ", "第(\\d+)话"],
+    "epOffset": [0, 12],
     "rss": [
       "https://feed.example.com/rss?q=show",
       "https://backup.example.com/rss?q=show"
@@ -99,11 +100,11 @@ which case it is persisted back to `ANIRSS_SUBSCRIBE_FILE` (formatted JSON).
 
 | Field | Meaning |
 | --- | --- |
-| `title` | *Optional.* Human-readable label to make the file easier to read/edit; **not used by any business logic**. Omitted from the written file when not set. |
+| `title` | *Optional.* Human-readable label to make the file easier to read/edit; **not used by any business logic**. |
 | `tvdbId` | Series to subscribe, resolved via Sonarr's existing series (TVDB id). |
 | `season` | Season number to watch. |
-| `epRegex` | *Optional.* Regex applied to each RSS item title; the first capture group (or the whole match) is used and its digits are the episode number. Unset means `` ` (\d{2,}) ` ``; omitted from the written file when unset. |
-| `epOffset` | *Optional.* Added to the parsed episode number (for series whose numbering starts at a non-1 episode). Defaults to `0`; omitted from the written file when `0`. |
+| `epRegex` | *Optional.* Per-feed regexes applied to each RSS item title; the first capture group (or the whole match) is used and its digits are the episode number. A feed with no entry of its own — the array is shorter than `rss`, or the entry is blank — falls back to `epRegex[0]`, and to `` ` (\d{2,}) ` `` when index 0 is unset as well. Unset means the default everywhere. |
+| `epOffset` | *Optional.* Per-feed offsets added to the parsed episode number (for series whose numbering starts at a non-1 episode). Indexed and falling back exactly like `epRegex`, defaulting to `0`. |
 | `rss` | Feed URLs, **lower index = higher priority**. Used for picking the best source. |
 
 ## Usage
