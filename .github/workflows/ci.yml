@@ -4,19 +4,19 @@ on:
   push:
     branches: [main]
     tags: ['v*']
-    paths:
-      - '**'
-      - '!**/*.md'
-      - '!**/.*'
-      - '!**/.*/**'
+    # Positive list on purpose. '!**/.*' looks like "ignore dotfiles" but also matches
+    # extension-bearing files such as *.cs, so every source-only push to main silently
+    # skipped CI. Tag pushes ignore paths entirely, which is why releases were still built.
+    paths: &paths
+      - '**/*.cs'
+      - '**/*.csproj'
+      - '**/*.props'
+      - '**/*.sln'
+      - 'build.sh'
+      - 'test.sh'
       - '.github/**'
   pull_request:
-    paths:
-      - '**'
-      - '!**/*.md'
-      - '!**/.*'
-      - '!**/.*/**'
-      - '.github/**'
+    paths: *paths
 
 permissions:
   contents: write
