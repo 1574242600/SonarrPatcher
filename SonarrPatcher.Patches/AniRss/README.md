@@ -41,12 +41,17 @@ nothing internal is re-implemented.
    anything it can't map. For downloads carrying the `#ANIRSS{index}-{urlCrc32}` marker,
    the patch intercepts `CompletedDownloadService.Import` and hands the download to
    Sonarr's official `ManualImportCommand` with the episodes from the grab history:
-   - **Single file** → always bound to the grabbed episode(s).
-   - **Several files** → files Sonarr can already map keep their mapping; only the largest
-     unmapped file is bound to the grabbed episode, so a batch can never collapse onto one
-     episode.
+   - **Exactly one importable file** → always bound to the grabbed episode(s), whatever
+     Sonarr parsed.
+   - **Anything else** — nothing importable, or several files — is left to Sonarr's own
+     import with a warning. AniRss pushes one episode per release, so a multi-file download
+     is not what it pushed and guessing which file is the episode would be worse than
+     handing it back.
    - Files rejected for safety reasons (sample, unpacking, free space, dangerous file,
-     ...) are left out — only episode-matching/upgrade rejections are overridden.
+     ...) are left out. What AniRss already answered when it pushed the release is overridden
+     instead: identifying the series (Sonarr has only the file name to go on and often fails
+     at it), parsing the episode out of the file, matching it against the series, and the
+     upgrade checks.
    - Since it goes through `ManualImportService`, the download is completed like a normal
      import: history entry, `EpisodeImportedEvent`, upgrade notifications, and the
      download is removed from the queue. Because manual import bypasses the upgrade
@@ -138,8 +143,9 @@ services:
 
 Unit tests cover the episode-number regex parsing, the `#ANIRSS` marker handling, the
 subscribe config round-trip, the skip policy (grab history with and without a file, source
-resolution, in-flight and upgrade cases) and the import file-selection policy (single-file
-binding, multi-file handling, sample rejection). Integration tests drive the real
+resolution, in-flight and upgrade cases) and the import file policy (usable-file filtering,
+sample rejection, grabbed-episode binding, multi-file downloads left to Sonarr). Integration
+tests drive the real
 `CompletedDownloadService.Import` interception with stubbed Sonarr services and verify the
 patch targets exist in the running Sonarr build; they need a Sonarr publish dir containing
 `Sonarr.Core.dll`, `Sonarr.Common.dll`, `NLog.dll` and `0Harmony.dll` (default

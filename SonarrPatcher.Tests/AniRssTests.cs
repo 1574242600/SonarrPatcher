@@ -19,7 +19,6 @@ using NzbDrone.Core.MediaFiles.EpisodeImport.Manual;
 using NzbDrone.Core.Messaging.Commands;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Qualities;
-using NzbDrone.Core.Tv;
 using SonarrPatcher.Patches.AniRss;
 using Xunit;
 
@@ -664,106 +663,85 @@ namespace SonarrPatcher.Tests
             Assert.False(AniRssImportBinder.IsAniRssTitle(null));
         }
 
-        // ---- Import binder: file selection (require Sonarr.Core) ----
+        // ---- Import binder: usable items ----
 
         [SkippableFact]
-        public void SelectFiles_SingleFile_GetsTheGrabbedEpisode()
+        public void UsableItems_DropsFilesRejectedForSafetyReasons()
         {
             SkipIfSonarrMissing();
 
-            var items = new List<ManualImportItem> { Item("/d/ep01.mkv", 100, null) };
+            var sample = Item("/d/sample.mkv");
+            sample.Rejections = new[] { new ImportRejection(ImportRejectionReason.Sample, "sample") };
+            var good = Item("/d/ep01.mkv");
 
-            var files = AniRssImportBinder.SelectFiles(items, 1, new List<int> { 5 }, "dl-1");
+            var usable = AniRssImportBinder.UsableItems(new List<ManualImportItem> { sample, good });
 
-            var file = Assert.Single(files);
-            Assert.Equal(new[] { 5 }, file.EpisodeIds.ToArray());
-            Assert.Equal(1, file.SeriesId);
-            Assert.Equal("dl-1", file.DownloadId);
-            Assert.Equal(ImportMode.Auto, ImportMode.Auto);
+            Assert.Equal("/d/ep01.mkv", Assert.Single(usable).Path);
         }
 
         [SkippableFact]
-        public void SelectFiles_SingleFile_KeepsWhatSonarrParsed()
+        public void UsableItems_KeepsFilesOnlyRejectedForEpisodeMatching()
+        {
+            SkipIfSonarrMissing();
+
+            var unparseable = Item("/d/unparseable.mkv");
+            unparseable.Rejections = new[] { new ImportRejection(ImportRejectionReason.InvalidSeasonOrEpisode, "no episodes") };
+
+            Assert.Single(AniRssImportBinder.UsableItems(new List<ManualImportItem> { unparseable }));
+        }
+
+        [SkippableFact]
+        public void UsableItems_KeepsFilesSonarrCouldNotIdentify()
+        {
+            SkipIfSonarrMissing();
+
+            // Sonarr only has the file name to go on, which for an AniRss title is often not
+            // enough; the series and episode are known from the grab anyway.
+            var unknown = Item("/d/[Skymoon] 魔法光源股份有限公司 第二季 [09].mp4");
+            unknown.Rejections = new[] { new ImportRejection(ImportRejectionReason.UnknownSeries, "Unknown Series") };
+
+            Assert.Single(AniRssImportBinder.UsableItems(new List<ManualImportItem> { unknown }));
+        }
+
+        [SkippableFact]
+        public void UsableItems_WithoutItems_IsEmpty()
+        {
+            SkipIfSonarrMissing();
+
+            Assert.Empty(AniRssImportBinder.UsableItems(null));
+        }
+
+        // ---- Import binder: command file ----
+
+        [SkippableFact]
+        public void BuildFile_ForcesTheGrabbedEpisodes()
+        {
+            SkipIfSonarrMissing();
+
+            var file = AniRssImportBinder.BuildFile(Item("/d/ep01.mkv"), 1, new List<int> { 5 }, "dl-1");
+
+            Assert.Equal("/d/ep01.mkv", file.Path);
+            Assert.Equal(new[] { 5 }, file.EpisodeIds.ToArray());
+            Assert.Equal(1, file.SeriesId);
+            Assert.Equal("dl-1", file.DownloadId);
+        }
+
+        [SkippableFact]
+        public void BuildFile_KeepsWhatSonarrParsed()
         {
             SkipIfSonarrMissing();
 
             var quality = new QualityModel(Quality.Bluray1080p);
-            var item = Item("/d/ep01.mkv", 100, null);
+            var item = Item("/d/ep01.mkv");
             item.Quality = quality;
             item.ReleaseGroup = "Group";
             item.Languages = new List<Language> { Language.English };
 
-            var file = Assert.Single(AniRssImportBinder.SelectFiles(new List<ManualImportItem> { item }, 1, new List<int> { 5 }, "dl-1"));
+            var file = AniRssImportBinder.BuildFile(item, 1, new List<int> { 5 }, "dl-1");
 
             Assert.Same(quality, file.Quality);
             Assert.Equal("Group", file.ReleaseGroup);
             Assert.Equal(new[] { Language.English }, file.Languages.ToArray());
-        }
-
-        [SkippableFact]
-        public void SelectFiles_SeveralFiles_KeepsTheEpisodesSonarrParsed()
-        {
-            SkipIfSonarrMissing();
-
-            var items = new List<ManualImportItem>
-            {
-                Item("/d/a.mkv", 200, new List<Episode> { new Episode { Id = 7 } }),
-                Item("/d/b.mkv", 100, new List<Episode> { new Episode { Id = 8 } })
-            };
-
-            var files = AniRssImportBinder.SelectFiles(items, 1, new List<int> { 5 }, "dl-1");
-
-            Assert.Equal(2, files.Count);
-            Assert.Equal(new[] { 7 }, files[0].EpisodeIds.ToArray());
-            Assert.Equal(new[] { 8 }, files[1].EpisodeIds.ToArray());
-        }
-
-        [SkippableFact]
-        public void SelectFiles_SeveralFiles_BindsOnlyTheLargestUnmappedFile()
-        {
-            SkipIfSonarrMissing();
-
-            var items = new List<ManualImportItem>
-            {
-                Item("/d/big.mkv", 300, null),
-                Item("/d/small.mkv", 200, null),
-                Item("/d/mapped.mkv", 100, new List<Episode> { new Episode { Id = 9 } })
-            };
-
-            var files = AniRssImportBinder.SelectFiles(items, 1, new List<int> { 5 }, "dl-1");
-
-            Assert.Equal(2, files.Count);
-            Assert.Equal("/d/big.mkv", files[0].Path);
-            Assert.Equal(new[] { 5 }, files[0].EpisodeIds.ToArray());
-            Assert.Equal("/d/mapped.mkv", files[1].Path);
-            Assert.Equal(new[] { 9 }, files[1].EpisodeIds.ToArray());
-        }
-
-        [SkippableFact]
-        public void SelectFiles_DropsFilesRejectedForSafetyReasons()
-        {
-            SkipIfSonarrMissing();
-
-            var sample = Item("/d/sample.mkv", 300, null);
-            sample.Rejections = new[] { new ImportRejection(ImportRejectionReason.Sample, "sample") };
-            var good = Item("/d/ep01.mkv", 100, null);
-
-            var file = Assert.Single(AniRssImportBinder.SelectFiles(new List<ManualImportItem> { sample, good }, 1, new List<int> { 5 }, "dl-1"));
-
-            Assert.Equal("/d/ep01.mkv", file.Path);
-        }
-
-        [SkippableFact]
-        public void SelectFiles_KeepsFilesOnlyRejectedForEpisodeMatching()
-        {
-            SkipIfSonarrMissing();
-
-            var unparseable = Item("/d/unparseable.mkv", 100, null);
-            unparseable.Rejections = new[] { new ImportRejection(ImportRejectionReason.InvalidSeasonOrEpisode, "no episodes") };
-
-            var file = Assert.Single(AniRssImportBinder.SelectFiles(new List<ManualImportItem> { unparseable }, 1, new List<int> { 5 }, "dl-1"));
-
-            Assert.Equal(new[] { 5 }, file.EpisodeIds.ToArray());
         }
 
         // ---- Import binder: diverting the automatic import ----
@@ -792,7 +770,7 @@ namespace SonarrPatcher.Tests
             var history = new FakeHistoryService();
             history.Grabbed.Add(Grabbed("dl-anirss", 5, "[Group] Show 03 #ANIRSS1-12345678"));
             var manual = new FakeManualImportService();
-            manual.Items.Add(Item("/d/unparseable.mkv", 100, null));
+            manual.Items.Add(Item("/d/unparseable.mkv"));
             var queue = new FakeCommandQueue();
             Bind(history, manual, queue);
 
@@ -807,6 +785,45 @@ namespace SonarrPatcher.Tests
         }
 
         [SkippableFact]
+        public void ImportPrefix_SeveralImportableFiles_IsLeftToSonarr()
+        {
+            SkipIfSonarrMissing();
+
+            var history = new FakeHistoryService();
+            history.Grabbed.Add(Grabbed("dl-multi", 5, "[Group] Show 03 #ANIRSS1-12345678"));
+            var manual = new FakeManualImportService();
+            manual.Items.Add(Item("/d/a.mkv"));
+            manual.Items.Add(Item("/d/b.mkv"));
+            var queue = new FakeCommandQueue();
+            Bind(history, manual, queue);
+
+            Assert.True(AniRssImportBinder.ImportPrefix(Download("dl-multi", "/d/Show.S02E03")));
+            Assert.Empty(queue.Pushed);
+        }
+
+        [SkippableFact]
+        public void ImportPrefix_FileSonarrCannotIdentify_IsBoundToTheGrabbedEpisode()
+        {
+            SkipIfSonarrMissing();
+
+            // The shape of the download that reported "no importable file": a single-file
+            // AniRss release whose name Sonarr cannot resolve to a series.
+            var history = new FakeHistoryService();
+            history.Grabbed.Add(Grabbed("dl-unknown", 5, "[Skymoon-Raws] Show - 09 #ANIRSS0-8952e21b"));
+            var manual = new FakeManualImportService();
+            var item = Item("/d/[Skymoon] Show 第二季 [09].mp4");
+            item.Rejections = new[] { new ImportRejection(ImportRejectionReason.UnknownSeries, "Unknown Series") };
+            manual.Items.Add(item);
+            var queue = new FakeCommandQueue();
+            Bind(history, manual, queue);
+
+            Assert.False(AniRssImportBinder.ImportPrefix(Download("dl-unknown", "/d/[Skymoon] Show 第二季 [09].mp4")));
+
+            var command = Assert.IsType<ManualImportCommand>(Assert.Single(queue.Pushed));
+            Assert.Equal(new[] { 5 }, Assert.Single(command.Files).EpisodeIds.ToArray());
+        }
+
+        [SkippableFact]
         public void ImportPrefix_QueuesEachDownloadOnlyOnce()
         {
             SkipIfSonarrMissing();
@@ -814,7 +831,7 @@ namespace SonarrPatcher.Tests
             var history = new FakeHistoryService();
             history.Grabbed.Add(Grabbed("dl-once", 5, "[Group] Show 03 #ANIRSS1-12345678"));
             var manual = new FakeManualImportService();
-            manual.Items.Add(Item("/d/unparseable.mkv", 100, null));
+            manual.Items.Add(Item("/d/unparseable.mkv"));
             var queue = new FakeCommandQueue();
             Bind(history, manual, queue);
 
@@ -891,23 +908,16 @@ namespace SonarrPatcher.Tests
             };
         }
 
-        private static ManualImportItem Item(string path, long size, List<Episode> episodes)
+        private static ManualImportItem Item(string path)
         {
-            var item = new ManualImportItem
+            return new ManualImportItem
             {
                 Path = path,
                 Name = System.IO.Path.GetFileNameWithoutExtension(path),
-                Size = size,
+                Size = 100,
                 Quality = new QualityModel(Quality.Unknown),
                 Languages = new List<Language>()
             };
-
-            if (episodes != null)
-            {
-                item.Episodes = episodes;
-            }
-
-            return item;
         }
 
         private static TrackedDownload Download(string downloadId, string outputPath)

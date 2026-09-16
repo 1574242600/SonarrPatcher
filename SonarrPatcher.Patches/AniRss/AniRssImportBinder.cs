@@ -56,15 +56,19 @@ namespace SonarrPatcher.Patches.AniRss
         internal static TimeSpan RequeueCooldown = TimeSpan.FromMinutes(10);
 
         /// <summary>
-        /// Rejection reasons the manual import is allowed to override. These are all about
-        /// matching a file to an episode or deciding whether it is an upgrade — exactly the
-        /// decisions AniRss already made when it pushed the release. Anything else (sample,
-        /// unpacking, free space, dangerous file...) keeps the file excluded.
+        /// Rejection reasons the manual import is allowed to override, and only ever for a
+        /// download that holds a single usable file. These are the checks AniRss already
+        /// answered when it pushed the release: identifying the series, parsing the episode out
+        /// of the file, matching it against the series, and deciding whether it is an upgrade.
+        /// The first two matter most in practice — Sonarr only has the file name to go on, and
+        /// for an AniRss title that says little. Anything else (sample, unpacking, free space,
+        /// dangerous file...) keeps the file excluded.
         /// </summary>
         private static readonly HashSet<ImportRejectionReason> OverridableReasons = new HashSet<ImportRejectionReason>
         {
-            ImportRejectionReason.InvalidSeasonOrEpisode,
+            ImportRejectionReason.UnknownSeries,
             ImportRejectionReason.UnableToParse,
+            ImportRejectionReason.InvalidSeasonOrEpisode,
             ImportRejectionReason.NoEpisodes,
             ImportRejectionReason.MissingAbsoluteEpisodeNumber,
             ImportRejectionReason.EpisodeNotFoundInRelease,
@@ -200,13 +204,23 @@ namespace SonarrPatcher.Patches.AniRss
             // and release group already parsed, plus the rejections the normal import would
             // produce. Only the episode mapping is ours to decide.
             var items = _manualImportService.GetMediaFiles(outputPath, downloadId, seriesId, true);
-            var files = SelectFiles(items, seriesId, episodeIds, downloadId);
+            var usable = UsableItems(items);
 
-            if (files.Count == 0)
+            if (usable.Count == 0)
             {
                 Log.Warn("no importable file in '" + outputPath + "', leaving it to Sonarr.");
                 return false;
             }
+
+            // AniRss pushes one episode per release, so more than one importable file means the
+            // download is not what it pushed. Do not guess which of them is the episode.
+            if (usable.Count > 1)
+            {
+                Log.Warn("'" + downloadItem.Title + "' holds " + usable.Count + " importable files, leaving it to Sonarr.");
+                return false;
+            }
+
+            var files = new List<ManualImportFile> { BuildFile(usable[0], seriesId, episodeIds, downloadId) };
 
             _commandQueue.Push(new ManualImportCommand { Files = files, ImportMode = ImportMode.Auto });
 
@@ -220,67 +234,36 @@ namespace SonarrPatcher.Patches.AniRss
         }
 
         /// <summary>
-        /// Turns Sonarr's manual-import items into command files, forcing the grabbed
-        /// episodes where it is unambiguous. Single-file downloads always get the grabbed
-        /// episodes; with several files Sonarr's own mapping is kept and only the largest
-        /// unmapped file is bound to the grabbed episode, so a batch can never collapse
-        /// onto one episode. Items rejected for anything other than episode matching or
-        /// upgrade checks (samples, unpacking, free space...) are dropped.
+        /// The items the manual import is allowed to use. Anything rejected for a reason other
+        /// than episode matching or upgrade checks (sample, unpacking, free space...) is
+        /// dropped: those are the checks AniRss did not make when it pushed the release.
         /// </summary>
-        internal static List<ManualImportFile> SelectFiles(List<ManualImportItem> items, int seriesId, List<int> episodeIds, string downloadId)
+        internal static List<ManualImportItem> UsableItems(List<ManualImportItem> items)
         {
-            var files = new List<ManualImportFile>();
+            return (items ?? new List<ManualImportItem>()).Where(IsOverridable).ToList();
+        }
 
-            var usable = (items ?? new List<ManualImportItem>())
-                .Where(IsOverridable)
-                .OrderByDescending(i => i.Size)
-                .ToList();
-
-            if (usable.Count == 0)
+        /// <summary>
+        /// Turns one usable item into a command file, forcing the grabbed episodes: for an
+        /// AniRss release the episode picked from the feed is the right one even when Sonarr
+        /// mapped the file to something else, or could not map it at all. Everything Sonarr
+        /// parsed (quality, languages, release group) is passed through untouched.
+        /// </summary>
+        internal static ManualImportFile BuildFile(ManualImportItem item, int seriesId, List<int> episodeIds, string downloadId)
+        {
+            return new ManualImportFile
             {
-                return files;
-            }
-
-            var boundUnmappedFile = false;
-
-            foreach (var item in usable)
-            {
-                List<int> ids;
-
-                if (usable.Count == 1)
-                {
-                    ids = episodeIds;
-                }
-                else if (item.Episodes != null && item.Episodes.Count > 0)
-                {
-                    ids = item.Episodes.Select(e => e.Id).ToList();
-                }
-                else if (!boundUnmappedFile)
-                {
-                    ids = episodeIds;
-                    boundUnmappedFile = true;
-                }
-                else
-                {
-                    continue;
-                }
-
-                files.Add(new ManualImportFile
-                {
-                    Path = item.Path,
-                    FolderName = item.FolderName,
-                    SeriesId = seriesId,
-                    EpisodeIds = ids,
-                    Quality = item.Quality ?? new QualityModel(Quality.Unknown),
-                    Languages = item.Languages,
-                    ReleaseGroup = item.ReleaseGroup,
-                    ReleaseType = item.ReleaseType,
-                    IndexerFlags = item.IndexerFlags,
-                    DownloadId = downloadId
-                });
-            }
-
-            return files;
+                Path = item.Path,
+                FolderName = item.FolderName,
+                SeriesId = seriesId,
+                EpisodeIds = episodeIds,
+                Quality = item.Quality ?? new QualityModel(Quality.Unknown),
+                Languages = item.Languages,
+                ReleaseGroup = item.ReleaseGroup,
+                ReleaseType = item.ReleaseType,
+                IndexerFlags = item.IndexerFlags,
+                DownloadId = downloadId
+            };
         }
 
         private static bool IsOverridable(ManualImportItem item)
