@@ -137,16 +137,16 @@ namespace SonarrPatcher.Patches.AniRss
         }
 
         /// <summary>
-        /// Prefers the subscriptions carried by the command (persisting them to the
-        /// subscribe file), otherwise falls back to the subscribe file on disk.
-        /// Returns null when there is nothing to process.
+        /// Prefers the subscriptions carried by the command, otherwise falls back to
+        /// the subscribe file on disk. Subscriptions carried by the command are
+        /// persisted to the file first: as the whole list, or merged into it when the
+        /// command updates. Returns null when there is nothing to process.
         /// </summary>
         private List<AniRssSubscribeItem> LoadConfig(AniRssCommand message)
         {
             if (message.Subscribe != null && message.Subscribe.Count > 0)
             {
-                WriteConfigFile(AniRssPatch.SubscribeFile, message.Subscribe);
-                return message.Subscribe;
+                return PersistSubscriptions(message);
             }
 
             var configPath = AniRssPatch.SubscribeFile;
@@ -163,6 +163,68 @@ namespace SonarrPatcher.Patches.AniRss
             }
 
             return ReadConfigFile(configPath);
+        }
+
+        /// <summary>
+        /// Writes the subscriptions carried by the command to the subscribe file, and
+        /// returns the list to run the pass on: the command's own list, or - when the
+        /// command updates - what it merged into the file. An update may be the first
+        /// command that ever writes the file, so a file that cannot be read is merged
+        /// into as if it were empty.
+        /// </summary>
+        private List<AniRssSubscribeItem> PersistSubscriptions(AniRssCommand message)
+        {
+            if (!message.Update)
+            {
+                WriteConfigFile(AniRssPatch.SubscribeFile, message.Subscribe);
+                return message.Subscribe;
+            }
+
+            var configPath = AniRssPatch.SubscribeFile;
+
+            List<AniRssSubscribeItem> existing;
+            try
+            {
+                existing = ReadConfigFile(configPath);
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn("{0}, merging into an empty subscription list.", ex.Message);
+                existing = new List<AniRssSubscribeItem>();
+            }
+
+            var merged = MergeSubscriptions(existing, message.Subscribe);
+            WriteConfigFile(configPath, merged);
+
+            return merged;
+        }
+
+        /// <summary>
+        /// Merges the command's subscriptions into the ones already in the file: an
+        /// entry replaces the file's entry for the same series and season, the entries
+        /// the command does not carry are kept, and the entries the file does not have
+        /// are appended. A subscription is identified by the series and season it
+        /// watches - the label is decoration and the feeds are content, so neither is
+        /// part of the identity, and a replaced entry keeps its place in the file.
+        /// </summary>
+        internal static List<AniRssSubscribeItem> MergeSubscriptions(List<AniRssSubscribeItem> existing, List<AniRssSubscribeItem> incoming)
+        {
+            var merged = new List<AniRssSubscribeItem>(existing);
+
+            foreach (var item in incoming)
+            {
+                var index = merged.FindIndex(e => e.TvdbId == item.TvdbId && e.Season == item.Season);
+                if (index >= 0)
+                {
+                    merged[index] = item;
+                }
+                else
+                {
+                    merged.Add(item);
+                }
+            }
+
+            return merged;
         }
 
         private int? ResolveDownloadClientId()

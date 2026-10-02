@@ -587,6 +587,89 @@ namespace SonarrPatcher.Tests
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true }));
         }
 
+        // ---- Command payload: merging an update into the file ----
+
+        [Fact]
+        public void MergeSubscriptions_UnknownSubscription_IsAppended()
+        {
+            var existing = new List<AniRssSubscribeItem> { Subscription(100, 1) };
+            var incoming = new List<AniRssSubscribeItem> { Subscription(200, 1) };
+
+            var merged = AniRssCommandExecutor.MergeSubscriptions(existing, incoming);
+
+            Assert.Equal(2, merged.Count);
+            Assert.Same(existing[0], merged[0]);
+            Assert.Same(incoming[0], merged[1]);
+        }
+
+        [Fact]
+        public void MergeSubscriptions_SameSeriesAndSeason_ReplacesInPlace()
+        {
+            var existing = new List<AniRssSubscribeItem> { Subscription(100, 1), Subscription(200, 1) };
+            var updated = Subscription(100, 1);
+            updated.Rss = new List<string> { "https://feed.example/new" };
+
+            var merged = AniRssCommandExecutor.MergeSubscriptions(existing, new List<AniRssSubscribeItem> { updated });
+
+            Assert.Equal(2, merged.Count);
+            Assert.Same(updated, merged[0]);
+            Assert.Same(existing[1], merged[1]);
+        }
+
+        [Fact]
+        public void MergeSubscriptions_OtherSeasonOfTheSameSeries_IsAppended()
+        {
+            // A season is subscribed to on its own: the same series at another season is
+            // a different subscription, not an update of this one.
+            var existing = new List<AniRssSubscribeItem> { Subscription(100, 1) };
+            var incoming = new List<AniRssSubscribeItem> { Subscription(100, 2) };
+
+            var merged = AniRssCommandExecutor.MergeSubscriptions(existing, incoming);
+
+            Assert.Equal(2, merged.Count);
+            Assert.Same(incoming[0], merged[1]);
+        }
+
+        [Fact]
+        public void MergeSubscriptions_KeepsSubscriptionsTheCommandDoesNotCarry()
+        {
+            // The caller holds what it changed, not the whole file: everything else has
+            // to survive the update.
+            var existing = new List<AniRssSubscribeItem> { Subscription(100, 1), Subscription(200, 1), Subscription(300, 1) };
+            var updated = Subscription(300, 1);
+
+            var merged = AniRssCommandExecutor.MergeSubscriptions(existing, new List<AniRssSubscribeItem> { updated });
+
+            Assert.Equal(3, merged.Count);
+            Assert.Same(existing[0], merged[0]);
+            Assert.Same(existing[1], merged[1]);
+            Assert.Same(updated, merged[2]);
+        }
+
+        [Fact]
+        public void MergeSubscriptions_NoSubscriptionsYet_IsThePayload()
+        {
+            var incoming = new List<AniRssSubscribeItem> { Subscription(100, 1), Subscription(200, 2) };
+
+            var merged = AniRssCommandExecutor.MergeSubscriptions(new List<AniRssSubscribeItem>(), incoming);
+
+            Assert.Equal(incoming, merged);
+        }
+
+        [Fact]
+        public void MergeSubscriptions_PayloadRepeatsASubscription_KeepsTheLastOne()
+        {
+            // A caller sending the same series and season twice must not duplicate the
+            // entry in the file.
+            var existing = new List<AniRssSubscribeItem> { Subscription(100, 1) };
+            var first = Subscription(100, 1);
+            var last = Subscription(100, 1);
+
+            var merged = AniRssCommandExecutor.MergeSubscriptions(existing, new List<AniRssSubscribeItem> { first, last });
+
+            Assert.Same(last, Assert.Single(merged));
+        }
+
         // ---- Integration tests (require Sonarr.Core.dll) ----
 
         [SkippableFact]
@@ -597,6 +680,16 @@ namespace SonarrPatcher.Tests
             LoadIfAbsent(corePath);
 
             Assert.True(typeof(Command).IsAssignableFrom(typeof(AniRssCommand)));
+        }
+
+        [SkippableFact]
+        public void AniRssCommand_MergesByDefault()
+        {
+            // Merging is the default: a caller that sends only the subscriptions it
+            // changed must not lose the rest of the file by omission.
+            SkipIfSonarrMissing();
+
+            Assert.True(new AniRssCommand().Update);
         }
 
         [SkippableFact]
@@ -1008,6 +1101,17 @@ namespace SonarrPatcher.Tests
                 TvdbId = 100,
                 Season = 2,
                 Rss = new List<string> { "https://feed.example/a", "https://feed.example/b" }
+            };
+        }
+
+        /// <summary>One subscription entry, identified by the series and season it watches.</summary>
+        private static AniRssSubscribeItem Subscription(int tvdbId, int season)
+        {
+            return new AniRssSubscribeItem
+            {
+                TvdbId = tvdbId,
+                Season = season,
+                Rss = new List<string> { "https://feed.example/" + tvdbId + "/" + season }
             };
         }
 

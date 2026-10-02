@@ -92,9 +92,13 @@ but every pass skips execution (with a warning) until the file appears.
 
 A JSON array of subscription entries. The file is read every pass, so editing it takes
 effect on the next run; it can also be updated through the `AniRss` command payload, in
-which case it is persisted back to `ANIRSS_SUBSCRIBE_FILE` (formatted JSON). Entries that
-finish are removed from it automatically, so the file stays a watch list instead of
-growing into a log of everything ever watched.
+which case it is persisted back to `ANIRSS_SUBSCRIBE_FILE` (formatted JSON). The payload is
+merged into the file by default — an entry replaces the file's entry for the same `tvdbId`
+and `season`, everything else in the file is kept, and entries the file does not have are
+appended; `"update": false` makes it replace the file instead, and a file that cannot be read
+is merged into as if it were empty. Entries that finish are removed from the file
+automatically, so it stays a watch list instead of growing into a log of everything ever
+watched.
 
 ```json
 [
@@ -150,9 +154,9 @@ services:
 
 Unit tests cover the episode-number regex parsing, the `#ANIRSS` marker handling, the
 subscribe config round-trip, the skip policy (grab history with and without a file, source
-resolution, in-flight and upgrade cases), the finished-subscription rule and the import file
-policy (usable-file filtering, sample rejection, grabbed-episode binding, multi-file
-downloads left to Sonarr). Integration tests drive the real
+resolution, in-flight and upgrade cases), the finished-subscription rule, the update merge and
+the import file policy (usable-file filtering, sample rejection, grabbed-episode binding,
+multi-file downloads left to Sonarr). Integration tests drive the real
 `CompletedDownloadService.Import` interception with stubbed Sonarr services and verify the
 patch targets exist in the running Sonarr build; they need a Sonarr publish dir containing
 `Sonarr.Core.dll`, `Sonarr.Common.dll`, `NLog.dll` and `0Harmony.dll` (default
