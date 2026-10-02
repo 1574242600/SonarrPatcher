@@ -26,7 +26,10 @@ namespace SonarrPatcher.Patches.AniRss
     /// without a file means it is queued, failed or was deleted). Every pushed
     /// release is tagged with <c>#ANIRSS{index}-{urlCrc32}</c> in its title, which is
     /// persisted into the grab history so later runs can detect ANIRSS-downloaded
-    /// episodes and decide whether a better source should replace them.
+    /// episodes and decide whether a better source should replace them. A
+    /// subscription the pass finds nothing left to do for is dropped from the
+    /// subscribe file, which keeps the file a watch list rather than a log of
+    /// everything ever watched.
     /// <para>
     /// Logging: one summary line per subscription per run, plus one line per push,
     /// upgrade or failure. The per-item detail (each unparsed title, each unmapped
@@ -103,10 +106,34 @@ namespace SonarrPatcher.Patches.AniRss
                 return;
             }
 
+            var finished = new List<AniRssSubscribeItem>();
+
             foreach (var sub in config)
             {
-                ProcessSubscribeItem(sub, downloadClientId.Value);
+                if (ProcessSubscribeItem(sub, downloadClientId.Value))
+                {
+                    finished.Add(sub);
+                }
             }
+
+            CleanConfig(config, finished);
+        }
+
+        /// <summary>
+        /// Drops the subscriptions that have nothing left to do from the subscribe
+        /// file (see <see cref="IsFinished"/>): an entry that only re-lists a season
+        /// already complete from the top feed would be fetched in full on every pass
+        /// from then on. A pass that finished nothing writes nothing.
+        /// </summary>
+        private void CleanConfig(List<AniRssSubscribeItem> config, List<AniRssSubscribeItem> finished)
+        {
+            if (finished.Count == 0)
+            {
+                return;
+            }
+
+            config.RemoveAll(finished.Contains);
+            WriteConfigFile(AniRssPatch.SubscribeFile, config);
         }
 
         /// <summary>
@@ -166,13 +193,19 @@ namespace SonarrPatcher.Patches.AniRss
             return client.Definition.Id;
         }
 
-        private void ProcessSubscribeItem(AniRssSubscribeItem sub, int downloadClientId)
+        /// <summary>
+        /// Runs one subscription's pass: resolves the series, builds the lookups the
+        /// feed walk shares, walks every feed and reports the one summary line.
+        /// Returns true when the subscription has nothing left to do
+        /// (<see cref="IsFinished"/>) and may be dropped from the subscribe file.
+        /// </summary>
+        private bool ProcessSubscribeItem(AniRssSubscribeItem sub, int downloadClientId)
         {
             var series = _seriesService.FindByTvdbId(sub.TvdbId);
             if (series == null)
             {
                 _logger.Warn("No series with tvdbId {0} found, skipping.", sub.TvdbId);
-                return;
+                return false;
             }
 
             // A subscription with no feeds has nothing to walk. Warn before spending the
@@ -182,12 +215,13 @@ namespace SonarrPatcher.Patches.AniRss
             if (feedCount == 0)
             {
                 _logger.Warn("{0} S{1}: no rss sources configured, skipping.", series.Title, sub.Season);
-                return;
+                return false;
             }
 
             // Lookups used by every item of every feed are built once per subscription
             // instead of being rescanned inside the item loop.
-            var episodesByNumber = IndexEpisodesByNumber(series.Id, sub.Season);
+            var episodes = _episodeService.GetEpisodesBySeason(series.Id, sub.Season);
+            var episodesByNumber = IndexEpisodesByNumber(episodes);
             // Newest grab per episode: it identifies the ANIRSS source that owns an
             // episode, and records that the episode has a download behind it at all
             // (the reason an episode without a file is not pushed again).
@@ -218,12 +252,24 @@ namespace SonarrPatcher.Patches.AniRss
                 run.Stats.Skipped,
                 run.Stats.Unparsed,
                 run.Stats.Unmapped);
+
+            // Judged against the snapshot taken above, not against a re-read: a
+            // download queued by this pass has no file yet, and its grab record must
+            // not make an episode still waiting for its upgrade look settled.
+            if (!IsFinished(sub, episodes, latestGrabByEpisodeId))
+            {
+                return false;
+            }
+
+            _logger.Info("{0} S{1}: complete from the top feed, dropping the subscription.", series.Title, sub.Season);
+
+            return true;
         }
 
         /// <summary>Episode-per-number index; a duplicate number keeps the first episode.</summary>
-        private Dictionary<int, Episode> IndexEpisodesByNumber(int seriesId, int season)
+        private static Dictionary<int, Episode> IndexEpisodesByNumber(List<Episode> episodes)
         {
-            return _episodeService.GetEpisodesBySeason(seriesId, season)
+            return episodes
                 .GroupBy(e => e.EpisodeNumber)
                 .ToDictionary(g => g.Key, g => g.First());
         }
@@ -460,6 +506,50 @@ namespace SonarrPatcher.Patches.AniRss
             }
 
             return GetAniRssSourceIndex(sub, latestGrabByEpisodeId, episodeId);
+        }
+
+        /// <summary>
+        /// True when a subscription has nothing left to do: every episode of the
+        /// watched season is on disk and none of them is owned by a feed below the top
+        /// one, so no feed of the list can add or replace anything. A series Sonarr has
+        /// no episode for is never finished - the subscription would silently stop
+        /// watching a series whose episodes have not shown up yet.
+        /// <para>
+        /// A file ANIRSS did not grab - one that arrived by other means, or whose
+        /// grabbing feed was removed from the list, which leaves no index to resolve -
+        /// counts as the top feed's. The feed list exists to fill the gaps of and to
+        /// replace what lesser ANIRSS sources delivered, and such a file is never
+        /// touched (see <see cref="ShouldSkipEpisodeCore"/>), so keeping a
+        /// subscription alive for it would only re-list every feed forever.
+        /// </para>
+        /// </summary>
+        internal static bool IsFinished(AniRssSubscribeItem sub,
+                                        List<Episode> episodes,
+                                        Dictionary<int, EpisodeHistory> latestGrabByEpisodeId)
+        {
+            if (episodes.Count == 0)
+            {
+                return false;
+            }
+
+            foreach (var episode in episodes)
+            {
+                if (!episode.HasFile)
+                {
+                    // Not aired yet, still downloading, or lost: the subscription has
+                    // to stay until every episode of the season is in place.
+                    return false;
+                }
+
+                var source = GetAniRssSourceIndex(sub, latestGrabByEpisodeId, episode.Id);
+                if (source.HasValue && source.Value != 0)
+                {
+                    // Owned by a lower priority feed: the top feed may still replace it.
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private List<TorrentInfo> FetchAndParse(string url)

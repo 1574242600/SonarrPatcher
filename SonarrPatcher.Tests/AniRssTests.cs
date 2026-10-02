@@ -19,6 +19,7 @@ using NzbDrone.Core.MediaFiles.EpisodeImport.Manual;
 using NzbDrone.Core.Messaging.Commands;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Qualities;
+using NzbDrone.Core.Tv;
 using SonarrPatcher.Patches.AniRss;
 using Xunit;
 
@@ -331,6 +332,97 @@ namespace SonarrPatcher.Tests
         public void ShouldSkipEpisodeCore_GrabbedBetterSource_HasFile_Pushes()
         {
             Assert.False(AniRssCommandExecutor.ShouldSkipEpisodeCore(episodeHasFile: true, episodeHasGrabHistory: true, existingAniRssIndex: 1, rssIndex: 0));
+        }
+
+        // ---- Finished subscription: the entry cleanConfig drops from the file ----
+
+        [SkippableFact]
+        public void IsFinished_EveryEpisodeFromTopFeed_IsFinished()
+        {
+            SkipIfSonarrMissing();
+
+            var sub = TwoFeeds();
+            var history = new Dictionary<int, EpisodeHistory>
+            {
+                { 5, Grabbed("dl-1", 5, "Show 01 " + AniRssMarker(sub.Rss[0], 0)) },
+                { 6, Grabbed("dl-2", 6, "Show 02 " + AniRssMarker(sub.Rss[0], 0)) }
+            };
+
+            Assert.True(AniRssCommandExecutor.IsFinished(sub, new List<Episode> { EpisodeOnDisk(5), EpisodeOnDisk(6) }, history));
+        }
+
+        [SkippableFact]
+        public void IsFinished_EpisodeFromLowerPriorityFeed_IsNotFinished()
+        {
+            // The top feed may still replace that file, so there is something left to do.
+            SkipIfSonarrMissing();
+
+            var sub = TwoFeeds();
+            var history = new Dictionary<int, EpisodeHistory>
+            {
+                { 5, Grabbed("dl-1", 5, "Show 01 " + AniRssMarker(sub.Rss[0], 0)) },
+                { 6, Grabbed("dl-2", 6, "Show 02 " + AniRssMarker(sub.Rss[1], 1)) }
+            };
+
+            Assert.False(AniRssCommandExecutor.IsFinished(sub, new List<Episode> { EpisodeOnDisk(5), EpisodeOnDisk(6) }, history));
+        }
+
+        [SkippableFact]
+        public void IsFinished_FileAniRssDidNotGrab_CountsAsTopFeed()
+        {
+            // An episode downloaded by other means is never touched by AniRss, so a
+            // subscription has nothing left to do for it.
+            SkipIfSonarrMissing();
+
+            var sub = TwoFeeds();
+            var history = new Dictionary<int, EpisodeHistory>
+            {
+                { 5, Grabbed("dl-1", 5, "Show.S02E01.1080p.WEB") }
+            };
+
+            Assert.True(AniRssCommandExecutor.IsFinished(sub, new List<Episode> { EpisodeOnDisk(5) }, history));
+        }
+
+        [SkippableFact]
+        public void IsFinished_GrabbingFeedRemovedFromList_CountsAsTopFeed()
+        {
+            // The source that delivered the file is gone from the list, so no feed in
+            // it can replace the file any more.
+            SkipIfSonarrMissing();
+
+            var sub = TwoFeeds();
+            var history = new Dictionary<int, EpisodeHistory>
+            {
+                { 5, Grabbed("dl-1", 5, "Show 01 " + AniRssMarker("https://feed.example/removed", 0)) }
+            };
+
+            Assert.True(AniRssCommandExecutor.IsFinished(sub, new List<Episode> { EpisodeOnDisk(5) }, history));
+        }
+
+        [SkippableFact]
+        public void IsFinished_EpisodeStillMissing_IsNotFinished()
+        {
+            // Not aired, still downloading or lost: the subscription has to stay until
+            // every episode of the season is on disk.
+            SkipIfSonarrMissing();
+
+            var sub = TwoFeeds();
+            var history = new Dictionary<int, EpisodeHistory>
+            {
+                { 5, Grabbed("dl-1", 5, "Show 01 " + AniRssMarker(sub.Rss[0], 0)) }
+            };
+
+            Assert.False(AniRssCommandExecutor.IsFinished(sub, new List<Episode> { EpisodeOnDisk(5), EpisodeWithoutFile(6) }, history));
+        }
+
+        [SkippableFact]
+        public void IsFinished_NoEpisodes_IsNotFinished()
+        {
+            // Sonarr knows no episode of the season yet; dropping the subscription
+            // would silently stop watching the series.
+            SkipIfSonarrMissing();
+
+            Assert.False(AniRssCommandExecutor.IsFinished(TwoFeeds(), new List<Episode>(), new Dictionary<int, EpisodeHistory>()));
         }
 
         [Fact]
@@ -906,6 +998,35 @@ namespace SonarrPatcher.Tests
                 SeriesId = 1,
                 SourceTitle = sourceTitle
             };
+        }
+
+        /// <summary>Subscription with a top feed and a lower priority one.</summary>
+        private static AniRssSubscribeItem TwoFeeds()
+        {
+            return new AniRssSubscribeItem
+            {
+                TvdbId = 100,
+                Season = 2,
+                Rss = new List<string> { "https://feed.example/a", "https://feed.example/b" }
+            };
+        }
+
+        /// <summary>The <c>#ANIRSS</c> marker DownloadHelper appends to a pushed title.</summary>
+        private static string AniRssMarker(string rssUrl, int rssIndex)
+        {
+            return "#ANIRSS" + rssIndex + "-" + HashUtil.CalculateCrc(rssUrl);
+        }
+
+        /// <summary>Episode with a file on disk (<c>HasFile</c> is <c>EpisodeFileId &gt; 0</c>).</summary>
+        private static Episode EpisodeOnDisk(int id)
+        {
+            return new Episode { Id = id, EpisodeFileId = 1 };
+        }
+
+        /// <summary>Episode without a file: not aired, still downloading or lost.</summary>
+        private static Episode EpisodeWithoutFile(int id)
+        {
+            return new Episode { Id = id };
         }
 
         private static ManualImportItem Item(string path)

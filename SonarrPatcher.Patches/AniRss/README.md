@@ -29,6 +29,11 @@ nothing internal is re-implemented.
      on record for it yet,
    - queues the release with `DownloadService.DownloadReport`, appending
      `#ANIRSS{index}-{urlCrc32}` to the title, which is persisted into the grab history.
+   - drops a finished subscription from the subscribe file: every episode of the watched
+     season is on disk and came from the top feed, so no feed of the list can add or
+     replace anything any more. A file AniRss did not grab counts as the top feed's — it is
+     never touched (see [Skip policy](#skip-policy)), and keeping the entry alive for it
+     would only re-list every feed forever.
    - **Logging** — one summary line per subscription per pass
      (`pushed/upgraded/skipped/unparsed/unmapped`), plus one line per push, upgrade or
      failure. The per-item detail (every skip, every unparsed title, every unmapped
@@ -87,7 +92,9 @@ but every pass skips execution (with a warning) until the file appears.
 
 A JSON array of subscription entries. The file is read every pass, so editing it takes
 effect on the next run; it can also be updated through the `AniRss` command payload, in
-which case it is persisted back to `ANIRSS_SUBSCRIBE_FILE` (formatted JSON).
+which case it is persisted back to `ANIRSS_SUBSCRIBE_FILE` (formatted JSON). Entries that
+finish are removed from it automatically, so the file stays a watch list instead of
+growing into a log of everything ever watched.
 
 ```json
 [
@@ -143,9 +150,9 @@ services:
 
 Unit tests cover the episode-number regex parsing, the `#ANIRSS` marker handling, the
 subscribe config round-trip, the skip policy (grab history with and without a file, source
-resolution, in-flight and upgrade cases) and the import file policy (usable-file filtering,
-sample rejection, grabbed-episode binding, multi-file downloads left to Sonarr). Integration
-tests drive the real
+resolution, in-flight and upgrade cases), the finished-subscription rule and the import file
+policy (usable-file filtering, sample rejection, grabbed-episode binding, multi-file
+downloads left to Sonarr). Integration tests drive the real
 `CompletedDownloadService.Import` interception with stubbed Sonarr services and verify the
 patch targets exist in the running Sonarr build; they need a Sonarr publish dir containing
 `Sonarr.Core.dll`, `Sonarr.Common.dll`, `NLog.dll` and `0Harmony.dll` (default
