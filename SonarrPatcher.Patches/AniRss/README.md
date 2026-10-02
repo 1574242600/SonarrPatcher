@@ -19,7 +19,9 @@ nothing internal is re-implemented.
 1. **Scheduled task** — registers a new `AniRssCommand` task into Sonarr's own
    scheduled-task repository/cache, so the subscription pass runs every
    `ANIRSS_INTERVAL_MINUTES`.
-2. **Subscription pass** (`AniRssCommandExecutor`) — for each subscribed series:
+2. **Subscription pass** (`AniRssCommandExecutor`, with the subscribe file in
+   `AniRssSubscribeStore` and the rules in `AniRssSourcePolicy`) — for each subscribed
+   series:
    - loads the subscribe config (file or command payload),
    - resolves the download client (optionally by name),
    - fetches each RSS feed (host-level 500 ms rate limit), extracts the episode number
@@ -66,7 +68,7 @@ nothing internal is re-implemented.
 
 An episode is pushed **only when nothing is on record for it yet**. The feed walk only
 resolves the inputs; the decision itself lives in one place
-(`AniRssCommandExecutor.ShouldSkipEpisodeCore`) and is applied in this order:
+(`AniRssSourcePolicy.ShouldSkipEpisodeCore`) and is applied in this order:
 
 1. The episode is already owned by the same feed, or by a **higher-priority** one (lower
    index) → **skip**. A worse source adds nothing, and the duplicate would be rejected by

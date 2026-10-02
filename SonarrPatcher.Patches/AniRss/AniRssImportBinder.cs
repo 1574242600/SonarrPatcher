@@ -2,7 +2,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.RegularExpressions;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.Download;
 using NzbDrone.Core.Download.TrackedDownloads;
@@ -42,12 +41,6 @@ namespace SonarrPatcher.Patches.AniRss
     /// </summary>
     internal static class AniRssImportBinder
     {
-        /// <summary>
-        /// Marker AniRss appends to every pushed release title, and that Sonarr persists
-        /// in the grab history's source title. Format: <c>#ANIRSS{index}-{urlCrc32}</c>.
-        /// </summary>
-        internal static readonly Regex MarkerRegex = new Regex(@"#ANIRSS(\d+)-([0-9a-f]{8})", RegexOptions.Compiled);
-
         /// <summary>
         /// How long a download id is remembered after queueing its manual import. Sonarr
         /// retries <c>Import</c> every minute while the download stays pending, so without
@@ -101,31 +94,19 @@ namespace SonarrPatcher.Patches.AniRss
         private static bool _servicesWarned;
 
         /// <summary>
-        /// DI-built history service, forwarded by <see cref="AniRssCommandExecutor"/> (which
-        /// is constructed by Sonarr's container).
+        /// Hands the binder the services it cannot be injected with, because its entry
+        /// points are static Harmony methods. Called by <see cref="AniRssCommandExecutor"/>,
+        /// which is built by Sonarr's DI container (AutoAddServices scans this assembly) and
+        /// therefore holds the same singletons the import path uses. Constructor postfixes
+        /// are not an option: compiled constructor calls get inlined past the Harmony detour.
         /// </summary>
-        internal static IHistoryService HistoryService
+        internal static void Configure(IHistoryService historyService,
+                                       IManualImportService manualImportService,
+                                       IManageCommandQueue commandQueue)
         {
-            get => _historyService;
-            set => _historyService = value;
-        }
-
-        /// <summary>
-        /// DI-built manual import service, forwarded by <see cref="AniRssCommandExecutor"/>.
-        /// </summary>
-        internal static IManualImportService ManualImportService
-        {
-            get => _manualImportService;
-            set => _manualImportService = value;
-        }
-
-        /// <summary>
-        /// DI-built command queue, forwarded by <see cref="AniRssCommandExecutor"/>.
-        /// </summary>
-        internal static IManageCommandQueue CommandQueue
-        {
-            get => _commandQueue;
-            set => _commandQueue = value;
+            _historyService = historyService;
+            _manualImportService = manualImportService;
+            _commandQueue = commandQueue;
         }
 
         /// <summary>
@@ -287,7 +268,7 @@ namespace SonarrPatcher.Patches.AniRss
         /// <summary>True when a release/history title was produced by AniRss.</summary>
         internal static bool IsAniRssTitle(string title)
         {
-            return title != null && MarkerRegex.IsMatch(title);
+            return title != null && AniRssMarker.Regex.IsMatch(title);
         }
 
         private static void PruneQueued()

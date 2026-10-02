@@ -135,7 +135,7 @@ namespace SonarrPatcher.Tests
                 { 5, new EpisodeHistory { SourceTitle = "[G] Show 03 #ANIRSS0-" + bCrc } }
             };
 
-            Assert.Equal(1, AniRssCommandExecutor.GetAniRssSourceIndex(sub, history, 5));
+            Assert.Equal(1, AniRssSourcePolicy.GetAniRssSourceIndex(sub, history, 5));
         }
 
         [SkippableFact]
@@ -153,7 +153,7 @@ namespace SonarrPatcher.Tests
                 { 5, new EpisodeHistory { SourceTitle = "[G] Show 03 #ANIRSS0-" + bCrc } }
             };
 
-            Assert.Null(AniRssCommandExecutor.GetAniRssSourceIndex(sub, history, 5));
+            Assert.Null(AniRssSourcePolicy.GetAniRssSourceIndex(sub, history, 5));
         }
 
         [SkippableFact]
@@ -170,7 +170,7 @@ namespace SonarrPatcher.Tests
                 { 5, new EpisodeHistory { SourceTitle = "[G] Show 03 1080p" } }
             };
 
-            Assert.Null(AniRssCommandExecutor.GetAniRssSourceIndex(sub, history, 5));
+            Assert.Null(AniRssSourcePolicy.GetAniRssSourceIndex(sub, history, 5));
         }
 
         [SkippableFact]
@@ -183,7 +183,7 @@ namespace SonarrPatcher.Tests
                 Rss = new List<string> { "https://feed.example/a" }
             };
 
-            Assert.Null(AniRssCommandExecutor.GetAniRssSourceIndex(sub, new Dictionary<int, EpisodeHistory>(), 5));
+            Assert.Null(AniRssSourcePolicy.GetAniRssSourceIndex(sub, new Dictionary<int, EpisodeHistory>(), 5));
         }
 
         // Regression: the grab history is snapshotted once before the feed walk, so a
@@ -209,7 +209,7 @@ namespace SonarrPatcher.Tests
             // pre-run snapshot still points at index 1. The in-run push must win.
             var pushedThisRun = new Dictionary<int, int> { { 5, 0 } };
 
-            Assert.Equal(0, AniRssCommandExecutor.ResolveExistingSourceIndex(pushedThisRun, snapshot, sub, 5));
+            Assert.Equal(0, AniRssSourcePolicy.ResolveExistingSourceIndex(pushedThisRun, snapshot, sub, 5));
         }
 
         [SkippableFact]
@@ -227,7 +227,7 @@ namespace SonarrPatcher.Tests
                 { 5, new EpisodeHistory { SourceTitle = "[G] Show 03 #ANIRSS0-" + bCrc } }
             };
 
-            Assert.Equal(1, AniRssCommandExecutor.ResolveExistingSourceIndex(new Dictionary<int, int>(), snapshot, sub, 5));
+            Assert.Equal(1, AniRssSourcePolicy.ResolveExistingSourceIndex(new Dictionary<int, int>(), snapshot, sub, 5));
         }
 
         [SkippableFact]
@@ -240,7 +240,7 @@ namespace SonarrPatcher.Tests
                 Rss = new List<string> { "https://feed.example/a" }
             };
 
-            Assert.Null(AniRssCommandExecutor.ResolveExistingSourceIndex(new Dictionary<int, int>(), new Dictionary<int, EpisodeHistory>(), sub, 5));
+            Assert.Null(AniRssSourcePolicy.ResolveExistingSourceIndex(new Dictionary<int, int>(), new Dictionary<int, EpisodeHistory>(), sub, 5));
         }
 
         [Fact]
@@ -250,7 +250,7 @@ namespace SonarrPatcher.Tests
             var newer = new EpisodeHistory { EpisodeId = 5, Date = new DateTime(2026, 2, 1), SourceTitle = "[G] Show 03 #ANIRSS1-12345678" };
             var other = new EpisodeHistory { EpisodeId = 6, Date = new DateTime(2026, 3, 1), SourceTitle = "[G] Show 04 #ANIRSS0-12345678" };
 
-            var latest = AniRssCommandExecutor.LatestGrabByEpisodeId(new List<EpisodeHistory> { older, newer, other });
+            var latest = AniRssSourcePolicy.LatestGrabByEpisodeId(new List<EpisodeHistory> { older, newer, other });
 
             Assert.Equal(2, latest.Count);
             Assert.Same(newer, latest[5]);
@@ -260,7 +260,7 @@ namespace SonarrPatcher.Tests
         [Fact]
         public void LatestGrabByEpisodeId_EmptyHistory_ReturnsEmpty()
         {
-            Assert.Empty(AniRssCommandExecutor.LatestGrabByEpisodeId(new List<EpisodeHistory>()));
+            Assert.Empty(AniRssSourcePolicy.LatestGrabByEpisodeId(new List<EpisodeHistory>()));
         }
 
         [Fact]
@@ -269,7 +269,7 @@ namespace SonarrPatcher.Tests
             var first = new EpisodeHistory { EpisodeId = 5, Date = new DateTime(2026, 1, 1), SourceTitle = "[G] Show 03 #ANIRSS1-12345678" };
             var sameDate = new EpisodeHistory { EpisodeId = 5, Date = first.Date, SourceTitle = "[G] Show 03 #ANIRSS2-12345678" };
 
-            var latest = AniRssCommandExecutor.LatestGrabByEpisodeId(new List<EpisodeHistory> { first, sameDate });
+            var latest = AniRssSourcePolicy.LatestGrabByEpisodeId(new List<EpisodeHistory> { first, sameDate });
 
             Assert.Same(first, latest[5]);
         }
@@ -279,7 +279,7 @@ namespace SonarrPatcher.Tests
         [Fact]
         public void ShouldSkipEpisodeCore_NotGrabbed_NoFile_Pushes()
         {
-            Assert.False(AniRssCommandExecutor.ShouldSkipEpisodeCore(episodeHasFile: false, episodeHasGrabHistory: false, existingAniRssIndex: null, rssIndex: 0));
+            Assert.False(AniRssSourcePolicy.ShouldSkipEpisodeCore(episodeHasFile: false, episodeHasGrabHistory: false, existingAniRssIndex: null, rssIndex: 0));
         }
 
         [Fact]
@@ -290,13 +290,13 @@ namespace SonarrPatcher.Tests
             // Covers both an episode Sonarr itself grabbed (no ANIRSS marker) and an
             // ANIRSS grab whose feed was removed from the subscription, which leaves
             // no index to resolve.
-            Assert.True(AniRssCommandExecutor.ShouldSkipEpisodeCore(episodeHasFile: false, episodeHasGrabHistory: true, existingAniRssIndex: null, rssIndex: 0));
+            Assert.True(AniRssSourcePolicy.ShouldSkipEpisodeCore(episodeHasFile: false, episodeHasGrabHistory: true, existingAniRssIndex: null, rssIndex: 0));
         }
 
         [Fact]
         public void ShouldSkipEpisodeCore_NotGrabbed_HasFile_Skips()
         {
-            Assert.True(AniRssCommandExecutor.ShouldSkipEpisodeCore(episodeHasFile: true, episodeHasGrabHistory: false, existingAniRssIndex: null, rssIndex: 0));
+            Assert.True(AniRssSourcePolicy.ShouldSkipEpisodeCore(episodeHasFile: true, episodeHasGrabHistory: false, existingAniRssIndex: null, rssIndex: 0));
         }
 
         [Fact]
@@ -305,13 +305,13 @@ namespace SonarrPatcher.Tests
             // Regression: re-pushing the same torrent while the download is still in
             // flight makes qBittorrent reject the duplicate ("Download client failed
             // to add torrent").
-            Assert.True(AniRssCommandExecutor.ShouldSkipEpisodeCore(episodeHasFile: false, episodeHasGrabHistory: true, existingAniRssIndex: 1, rssIndex: 1));
+            Assert.True(AniRssSourcePolicy.ShouldSkipEpisodeCore(episodeHasFile: false, episodeHasGrabHistory: true, existingAniRssIndex: 1, rssIndex: 1));
         }
 
         [Fact]
         public void ShouldSkipEpisodeCore_GrabbedWorseSource_DownloadInProgress_Skips()
         {
-            Assert.True(AniRssCommandExecutor.ShouldSkipEpisodeCore(episodeHasFile: false, episodeHasGrabHistory: true, existingAniRssIndex: 0, rssIndex: 2));
+            Assert.True(AniRssSourcePolicy.ShouldSkipEpisodeCore(episodeHasFile: false, episodeHasGrabHistory: true, existingAniRssIndex: 0, rssIndex: 2));
         }
 
         [Fact]
@@ -319,19 +319,19 @@ namespace SonarrPatcher.Tests
         {
             // A higher priority source no longer pushes while the first download is
             // unfinished - the upgrade happens once the episode is on disk.
-            Assert.True(AniRssCommandExecutor.ShouldSkipEpisodeCore(episodeHasFile: false, episodeHasGrabHistory: true, existingAniRssIndex: 2, rssIndex: 0));
+            Assert.True(AniRssSourcePolicy.ShouldSkipEpisodeCore(episodeHasFile: false, episodeHasGrabHistory: true, existingAniRssIndex: 2, rssIndex: 0));
         }
 
         [Fact]
         public void ShouldSkipEpisodeCore_GrabbedSameSource_HasFile_Skips()
         {
-            Assert.True(AniRssCommandExecutor.ShouldSkipEpisodeCore(episodeHasFile: true, episodeHasGrabHistory: true, existingAniRssIndex: 1, rssIndex: 1));
+            Assert.True(AniRssSourcePolicy.ShouldSkipEpisodeCore(episodeHasFile: true, episodeHasGrabHistory: true, existingAniRssIndex: 1, rssIndex: 1));
         }
 
         [Fact]
         public void ShouldSkipEpisodeCore_GrabbedBetterSource_HasFile_Pushes()
         {
-            Assert.False(AniRssCommandExecutor.ShouldSkipEpisodeCore(episodeHasFile: true, episodeHasGrabHistory: true, existingAniRssIndex: 1, rssIndex: 0));
+            Assert.False(AniRssSourcePolicy.ShouldSkipEpisodeCore(episodeHasFile: true, episodeHasGrabHistory: true, existingAniRssIndex: 1, rssIndex: 0));
         }
 
         // ---- Finished subscription: the entry cleanConfig drops from the file ----
@@ -344,11 +344,11 @@ namespace SonarrPatcher.Tests
             var sub = TwoFeeds();
             var history = new Dictionary<int, EpisodeHistory>
             {
-                { 5, Grabbed("dl-1", 5, "Show 01 " + AniRssMarker(sub.Rss[0], 0)) },
-                { 6, Grabbed("dl-2", 6, "Show 02 " + AniRssMarker(sub.Rss[0], 0)) }
+                { 5, Grabbed("dl-1", 5, AniRssMarker.Append("Show 01", 0, sub.Rss[0])) },
+                { 6, Grabbed("dl-2", 6, AniRssMarker.Append("Show 02", 0, sub.Rss[0])) }
             };
 
-            Assert.True(AniRssCommandExecutor.IsFinished(sub, new List<Episode> { EpisodeOnDisk(5), EpisodeOnDisk(6) }, history));
+            Assert.True(AniRssSourcePolicy.IsFinished(sub, new List<Episode> { EpisodeOnDisk(5), EpisodeOnDisk(6) }, history));
         }
 
         [SkippableFact]
@@ -360,11 +360,11 @@ namespace SonarrPatcher.Tests
             var sub = TwoFeeds();
             var history = new Dictionary<int, EpisodeHistory>
             {
-                { 5, Grabbed("dl-1", 5, "Show 01 " + AniRssMarker(sub.Rss[0], 0)) },
-                { 6, Grabbed("dl-2", 6, "Show 02 " + AniRssMarker(sub.Rss[1], 1)) }
+                { 5, Grabbed("dl-1", 5, AniRssMarker.Append("Show 01", 0, sub.Rss[0])) },
+                { 6, Grabbed("dl-2", 6, AniRssMarker.Append("Show 02", 1, sub.Rss[1])) }
             };
 
-            Assert.False(AniRssCommandExecutor.IsFinished(sub, new List<Episode> { EpisodeOnDisk(5), EpisodeOnDisk(6) }, history));
+            Assert.False(AniRssSourcePolicy.IsFinished(sub, new List<Episode> { EpisodeOnDisk(5), EpisodeOnDisk(6) }, history));
         }
 
         [SkippableFact]
@@ -380,7 +380,7 @@ namespace SonarrPatcher.Tests
                 { 5, Grabbed("dl-1", 5, "Show.S02E01.1080p.WEB") }
             };
 
-            Assert.True(AniRssCommandExecutor.IsFinished(sub, new List<Episode> { EpisodeOnDisk(5) }, history));
+            Assert.True(AniRssSourcePolicy.IsFinished(sub, new List<Episode> { EpisodeOnDisk(5) }, history));
         }
 
         [SkippableFact]
@@ -393,10 +393,10 @@ namespace SonarrPatcher.Tests
             var sub = TwoFeeds();
             var history = new Dictionary<int, EpisodeHistory>
             {
-                { 5, Grabbed("dl-1", 5, "Show 01 " + AniRssMarker("https://feed.example/removed", 0)) }
+                { 5, Grabbed("dl-1", 5, AniRssMarker.Append("Show 01", 0, "https://feed.example/removed")) }
             };
 
-            Assert.True(AniRssCommandExecutor.IsFinished(sub, new List<Episode> { EpisodeOnDisk(5) }, history));
+            Assert.True(AniRssSourcePolicy.IsFinished(sub, new List<Episode> { EpisodeOnDisk(5) }, history));
         }
 
         [SkippableFact]
@@ -409,10 +409,10 @@ namespace SonarrPatcher.Tests
             var sub = TwoFeeds();
             var history = new Dictionary<int, EpisodeHistory>
             {
-                { 5, Grabbed("dl-1", 5, "Show 01 " + AniRssMarker(sub.Rss[0], 0)) }
+                { 5, Grabbed("dl-1", 5, AniRssMarker.Append("Show 01", 0, sub.Rss[0])) }
             };
 
-            Assert.False(AniRssCommandExecutor.IsFinished(sub, new List<Episode> { EpisodeOnDisk(5), EpisodeWithoutFile(6) }, history));
+            Assert.False(AniRssSourcePolicy.IsFinished(sub, new List<Episode> { EpisodeOnDisk(5), EpisodeWithoutFile(6) }, history));
         }
 
         [SkippableFact]
@@ -422,7 +422,7 @@ namespace SonarrPatcher.Tests
             // would silently stop watching the series.
             SkipIfSonarrMissing();
 
-            Assert.False(AniRssCommandExecutor.IsFinished(TwoFeeds(), new List<Episode>(), new Dictionary<int, EpisodeHistory>()));
+            Assert.False(AniRssSourcePolicy.IsFinished(TwoFeeds(), new List<Episode>(), new Dictionary<int, EpisodeHistory>()));
         }
 
         [Fact]
@@ -595,7 +595,7 @@ namespace SonarrPatcher.Tests
             var existing = new List<AniRssSubscribeItem> { Subscription(100, 1) };
             var incoming = new List<AniRssSubscribeItem> { Subscription(200, 1) };
 
-            var merged = AniRssCommandExecutor.MergeSubscriptions(existing, incoming);
+            var merged = AniRssSubscribeStore.MergeSubscriptions(existing, incoming);
 
             Assert.Equal(2, merged.Count);
             Assert.Same(existing[0], merged[0]);
@@ -609,7 +609,7 @@ namespace SonarrPatcher.Tests
             var updated = Subscription(100, 1);
             updated.Rss = new List<string> { "https://feed.example/new" };
 
-            var merged = AniRssCommandExecutor.MergeSubscriptions(existing, new List<AniRssSubscribeItem> { updated });
+            var merged = AniRssSubscribeStore.MergeSubscriptions(existing, new List<AniRssSubscribeItem> { updated });
 
             Assert.Equal(2, merged.Count);
             Assert.Same(updated, merged[0]);
@@ -624,7 +624,7 @@ namespace SonarrPatcher.Tests
             var existing = new List<AniRssSubscribeItem> { Subscription(100, 1) };
             var incoming = new List<AniRssSubscribeItem> { Subscription(100, 2) };
 
-            var merged = AniRssCommandExecutor.MergeSubscriptions(existing, incoming);
+            var merged = AniRssSubscribeStore.MergeSubscriptions(existing, incoming);
 
             Assert.Equal(2, merged.Count);
             Assert.Same(incoming[0], merged[1]);
@@ -638,7 +638,7 @@ namespace SonarrPatcher.Tests
             var existing = new List<AniRssSubscribeItem> { Subscription(100, 1), Subscription(200, 1), Subscription(300, 1) };
             var updated = Subscription(300, 1);
 
-            var merged = AniRssCommandExecutor.MergeSubscriptions(existing, new List<AniRssSubscribeItem> { updated });
+            var merged = AniRssSubscribeStore.MergeSubscriptions(existing, new List<AniRssSubscribeItem> { updated });
 
             Assert.Equal(3, merged.Count);
             Assert.Same(existing[0], merged[0]);
@@ -651,7 +651,7 @@ namespace SonarrPatcher.Tests
         {
             var incoming = new List<AniRssSubscribeItem> { Subscription(100, 1), Subscription(200, 2) };
 
-            var merged = AniRssCommandExecutor.MergeSubscriptions(new List<AniRssSubscribeItem>(), incoming);
+            var merged = AniRssSubscribeStore.MergeSubscriptions(new List<AniRssSubscribeItem>(), incoming);
 
             Assert.Equal(incoming, merged);
         }
@@ -665,7 +665,7 @@ namespace SonarrPatcher.Tests
             var first = Subscription(100, 1);
             var last = Subscription(100, 1);
 
-            var merged = AniRssCommandExecutor.MergeSubscriptions(existing, new List<AniRssSubscribeItem> { first, last });
+            var merged = AniRssSubscribeStore.MergeSubscriptions(existing, new List<AniRssSubscribeItem> { first, last });
 
             Assert.Same(last, Assert.Single(merged));
         }
@@ -1077,9 +1077,7 @@ namespace SonarrPatcher.Tests
             // creation here.
             _ = new AniRssPatch();
 
-            AniRssImportBinder.HistoryService = history;
-            AniRssImportBinder.ManualImportService = manual;
-            AniRssImportBinder.CommandQueue = queue;
+            AniRssImportBinder.Configure(history, manual, queue);
         }
 
         private static EpisodeHistory Grabbed(string downloadId, int episodeId, string sourceTitle)
@@ -1113,12 +1111,6 @@ namespace SonarrPatcher.Tests
                 Season = season,
                 Rss = new List<string> { "https://feed.example/" + tvdbId + "/" + season }
             };
-        }
-
-        /// <summary>The <c>#ANIRSS</c> marker DownloadHelper appends to a pushed title.</summary>
-        private static string AniRssMarker(string rssUrl, int rssIndex)
-        {
-            return "#ANIRSS" + rssIndex + "-" + HashUtil.CalculateCrc(rssUrl);
         }
 
         /// <summary>Episode with a file on disk (<c>HasFile</c> is <c>EpisodeFileId &gt; 0</c>).</summary>
